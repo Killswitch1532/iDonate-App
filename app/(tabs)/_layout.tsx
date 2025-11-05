@@ -1,0 +1,106 @@
+import { Tabs } from 'expo-router';
+import React from 'react';
+
+import { HapticTab } from '@/components/haptic-tab';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+
+export default function TabLayout() {
+  const colorScheme = useColorScheme();
+
+  return (
+    <Tabs
+      screenOptions={{
+        tabBarActiveTintColor: '#4A90E2',
+        tabBarInactiveTintColor: '#9AA4AB',
+        headerShown: false,
+        tabBarButton: HapticTab,
+        tabBarStyle: {
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 80,
+          backgroundColor: '#FFFFFF',
+          borderTopWidth: 1,
+          borderTopColor: '#E8E8E8',
+          shadowColor: '#000',
+          shadowOpacity: 0.1,
+          shadowOffset: { width: 0, height: -2 },
+          shadowRadius: 8,
+          elevation: 8,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '500',
+          marginTop: 4,
+        },
+      }}>
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ color, focused }) => (
+            <IconSymbol 
+              size={24} 
+              name={focused ? "house.fill" : "house"} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="compatibility"
+        options={{
+          title: 'Compatibility',
+          tabBarIcon: ({ color, focused }) => (
+            <IconSymbol 
+              size={24} 
+              name={focused ? "heart.fill" : "heart"} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="map"
+        options={{
+          title: 'Map',
+          tabBarIcon: ({ color, focused }) => (
+            <IconSymbol 
+              size={24} 
+              name={focused ? "map.fill" : "map"} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          title: 'Notifications',
+          tabBarIcon: ({ color, focused }) => (
+            <IconSymbol 
+              size={24} 
+              name={focused ? "bell.fill" : "bell"} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color, focused }) => (
+            <IconSymbol 
+              size={24} 
+              name={focused ? "person.fill" : "person"} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+    </Tabs>
+  );
+}
