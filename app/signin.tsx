@@ -2,17 +2,22 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
+import { useAuth } from "@/contexts/AuthContext";
+import { upsertDonorProfile } from "@/services/donorService";
 
 export default function SignInScreen() {
+  const { signIn, signUp } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -24,6 +29,7 @@ export default function SignInScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [isLoading, setIsLoading] = useState(false);
 
   const bloodTypes = ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"];
 
@@ -70,11 +76,52 @@ export default function SignInScreen() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
-    if (validateForm()) {
-      // Direct navigation to home screen for all platforms
-      router.push("/(tabs)");
+  const handleSubmit = async () => {
+    if (!validateForm()) return;
+    setIsLoading(true);
+    try {
+      if (isSignUp) {
+        const { error } = await signUp(email, password, {
+          full_name: fullName,
+          user_type: 'donor',
+        });
+        if (error) {
+          Alert.alert('Sign Up Failed', error.message);
+          return;
+        }
+        // Create donor profile row with signup details
+        const { user } = (await (await import('@/lib/supabase')).supabase.auth.getUser()).data;
+        if (user) {
+          await upsertDonorProfile(user.id, {
+            blood_type: bloodType || null,
+            birth_date: dateOfBirth ? formatDateForDB(dateOfBirth) : null,
+          });
+        }
+        Alert.alert('Success', 'Account created! Please check your email to verify.', [
+          { text: 'OK', onPress: () => router.replace('/(tabs)') },
+        ]);
+      } else {
+        const { error } = await signIn(email, password);
+        if (error) {
+          Alert.alert('Sign In Failed', error.message);
+          return;
+        }
+        router.replace('/(tabs)');
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Something went wrong');
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  /** Convert DD/MM/YYYY to YYYY-MM-DD for Postgres */
+  const formatDateForDB = (dateStr: string): string => {
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    return dateStr;
   };
 
   const toggleAuthMode = () => {
@@ -389,16 +436,22 @@ export default function SignInScreen() {
           )}
 
           {/* Submit Button */}
-          <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-            <MaterialIcons
-              name="arrow-forward"
-              size={20}
-              color="#FFFFFF"
-              style={styles.submitIcon}
-            />
-            <ThemedText style={styles.submitText}>
-              {isSignUp ? "Create Account" : "Sign In"}
-            </ThemedText>
+          <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={isLoading}>
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <>
+                <MaterialIcons
+                  name="arrow-forward"
+                  size={20}
+                  color="#FFFFFF"
+                  style={styles.submitIcon}
+                />
+                <ThemedText style={styles.submitText}>
+                  {isSignUp ? "Create Account" : "Sign In"}
+                </ThemedText>
+              </>
+            )}
           </TouchableOpacity>
 
           {/* Divider */}

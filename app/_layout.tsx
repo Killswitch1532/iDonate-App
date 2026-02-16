@@ -1,8 +1,8 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import {
-    DarkTheme,
-    DefaultTheme,
-    ThemeProvider,
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
 } from "@react-navigation/native";
 import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -11,47 +11,51 @@ import { StyleSheet, Text, View } from "react-native";
 import "react-native-reanimated";
 
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 
 export const unstable_settings = {
   anchor: "(tabs)",
 };
 
 export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <RootLayoutNav />
+    </AuthProvider>
+  );
+}
+
+function RootLayoutNav() {
   const colorScheme = useColorScheme();
+  const { user, loading } = useAuth();
   const [appIsReady, setAppIsReady] = useState(false);
 
   useEffect(() => {
     async function prepare() {
       try {
-        console.log("Starting app preparation...");
-
         // Pre-load fonts, make any API calls you need to do here
-        // await Font.loadAsync({
-        //   // ... fonts
-        // });
-
-        // Artificially delay for demo purposes - remove this in production
-        console.log("Waiting 3 seconds to show splash screen...");
-        await new Promise((resolve) => setTimeout(resolve, 3000));
-
-        console.log("App preparation complete, hiding splash screen...");
+        await new Promise((resolve) => setTimeout(resolve, 2000));
       } catch (e) {
         console.warn("Error during app preparation:", e);
       } finally {
-        // Tell the application to render
         setAppIsReady(true);
-        console.log("Splash screen hidden");
-        // Navigate to onboarding after splash screen
-        setTimeout(() => {
-          router.push("/onboarding");
-        }, 100);
       }
     }
 
     prepare();
   }, []);
 
-  if (!appIsReady) {
+  useEffect(() => {
+    if (!appIsReady || loading) return;
+
+    if (user) {
+      router.replace('/(tabs)');
+    } else {
+      router.replace('/onboarding');
+    }
+  }, [appIsReady, loading, user]);
+
+  if (!appIsReady || loading) {
     return (
       <View style={styles.splashContainer}>
         <MaterialIcons
