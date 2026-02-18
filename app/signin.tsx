@@ -81,34 +81,93 @@ export default function SignInScreen() {
     setIsLoading(true);
     try {
       if (isSignUp) {
+        console.log('[iDonate:SignIn] Starting signup flow', { email, fullName, bloodType, dateOfBirth });
+
         const { error } = await signUp(email, password, {
           full_name: fullName,
           user_type: 'donor',
         });
         if (error) {
-          Alert.alert('Sign Up Failed', error.message);
+          console.error('[iDonate:SignIn] signUp returned error', {
+            code: error.code,
+            message: error.message,
+            status: error.status,
+            name: error.name,
+            fullError: JSON.stringify(error),
+          });
+          Alert.alert(
+            'Sign Up Failed',
+            `${error.message}${error.code ? `\n\nError code: ${error.code}` : ''}`
+          );
           return;
         }
+
         // Create donor profile row with signup details
-        const { user } = (await (await import('@/lib/supabase')).supabase.auth.getUser()).data;
+        console.log('[iDonate:SignIn] signUp succeeded, fetching user for donor profile...');
+        const { data: userData, error: getUserError } = await (
+          await import('@/lib/supabase')
+        ).supabase.auth.getUser();
+
+        if (getUserError) {
+          console.error('[iDonate:SignIn] getUser() failed after signUp', {
+            code: getUserError.code,
+            message: getUserError.message,
+            status: getUserError.status,
+            fullError: JSON.stringify(getUserError),
+          });
+        }
+
+        const user = userData?.user;
         if (user) {
-          await upsertDonorProfile(user.id, {
+          console.log('[iDonate:SignIn] Creating donor profile for user', { userId: user.id });
+          const { error: profileError } = await upsertDonorProfile(user.id, {
             blood_type: bloodType || null,
             birth_date: dateOfBirth ? formatDateForDB(dateOfBirth) : null,
           });
+          if (profileError) {
+            console.error('[iDonate:SignIn] upsertDonorProfile failed', {
+              userId: user.id,
+              code: profileError.code,
+              message: profileError.message,
+              details: profileError.details,
+              hint: profileError.hint,
+              fullError: JSON.stringify(profileError),
+            });
+            Alert.alert(
+              'Profile Creation Failed',
+              `Account created but profile could not be saved.\n\n${profileError.message}${profileError.hint ? `\nHint: ${profileError.hint}` : ''
+              }${profileError.code ? `\nCode: ${profileError.code}` : ''}`
+            );
+            return;
+          }
+        } else {
+          console.warn('[iDonate:SignIn] No user returned after signUp — profile not created');
         }
+
         Alert.alert('Success', 'Account created! Please check your email to verify.', [
           { text: 'OK', onPress: () => router.replace('/(tabs)') },
         ]);
       } else {
         const { error } = await signIn(email, password);
         if (error) {
+          console.error('[iDonate:SignIn] signIn returned error', {
+            code: error.code,
+            message: error.message,
+            status: error.status,
+            fullError: JSON.stringify(error),
+          });
           Alert.alert('Sign In Failed', error.message);
           return;
         }
         router.replace('/(tabs)');
       }
     } catch (e: any) {
+      console.error('[iDonate:SignIn] Unexpected exception in handleSubmit', {
+        message: e?.message,
+        stack: e?.stack,
+        name: e?.name,
+        fullError: JSON.stringify(e, Object.getOwnPropertyNames(e)),
+      });
       Alert.alert('Error', e.message || 'Something went wrong');
     } finally {
       setIsLoading(false);

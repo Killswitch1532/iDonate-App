@@ -17,11 +17,23 @@ const MAX_AGE = 65;
 
 /** Fetch the current user's donor profile */
 export async function getDonorProfile(userId: string) {
+    console.log('[iDonate:DonorService] getDonorProfile', { userId });
+
     const { data, error } = await supabase
         .from('donors')
         .select('*')
         .eq('id', userId)
         .single();
+
+    if (error) {
+        console.error('[iDonate:DonorService] getDonorProfile failed', {
+            userId,
+            code: error.code,
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+        });
+    }
 
     return { data, error };
 }
@@ -31,11 +43,28 @@ export async function upsertDonorProfile(
     userId: string,
     profile: Partial<Omit<DonorProfile, 'id'>>
 ) {
+    const payload = { id: userId, ...profile };
+    console.log('[iDonate:DonorService] upsertDonorProfile', { userId, profile: payload });
+
     const { data, error } = await supabase
         .from('donors')
-        .upsert({ id: userId, ...profile })
+        .upsert(payload)
         .select()
         .single();
+
+    if (error) {
+        console.error('[iDonate:DonorService] upsertDonorProfile failed', {
+            userId,
+            payload,
+            code: error.code,
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            fullError: JSON.stringify(error),
+        });
+    } else {
+        console.log('[iDonate:DonorService] upsertDonorProfile succeeded', { userId });
+    }
 
     return { data, error };
 }

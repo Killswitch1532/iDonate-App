@@ -60,10 +60,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .from('profiles')
             .select('*')
             .eq('id', userId)
-            .single();
+            .maybeSingle();
 
+        if (error) {
+            console.error('[iDonate:Auth] fetchProfile failed', {
+                userId,
+                code: error.code,
+                message: error.message,
+                details: error.details,
+                hint: error.hint,
+            });
+        }
         if (!error && data) {
+            console.log('[iDonate:Auth] Profile loaded', data);
             setProfile(data);
+        } else if (!error && !data) {
+            console.warn('[iDonate:Auth] No profile found for user', userId);
         }
     }
 
@@ -72,7 +84,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password: string,
         metadata: Record<string, any> = {}
     ) {
-        const { error } = await supabase.auth.signUp({
+        console.log('[iDonate:Auth] signUp attempt', {
+            email,
+            metadata: { full_name: metadata.full_name, user_type: metadata.user_type },
+        });
+
+        const { data, error } = await supabase.auth.signUp({
             email,
             password,
             options: {
@@ -82,6 +99,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 },
             },
         });
+
+        if (error) {
+            console.error('[iDonate:Auth] signUp error', {
+                code: error.code,
+                message: error.message,
+                status: error.status,
+                name: error.name,
+                // Log the full error for any extra fields
+                fullError: JSON.stringify(error),
+            });
+        } else {
+            console.log('[iDonate:Auth] signUp succeeded', {
+                userId: data?.user?.id,
+                emailConfirmed: data?.user?.email_confirmed_at,
+                session: data?.session ? 'present' : 'null',
+            });
+        }
+
         return { error };
     }
 

@@ -1,12 +1,35 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React from "react";
-import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function ProfileScreen() {
+  const { signOut } = useAuth();
+
+  const handleLogout = () => {
+    Alert.alert('Log Out', 'Are you sure you want to log out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Log Out',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await signOut();
+            console.log('[iDonate:Profile] User logged out');
+            router.replace('/signin');
+          } catch (e: any) {
+            console.error('[iDonate:Profile] Logout failed', e);
+            Alert.alert('Error', 'Failed to log out. Please try again.');
+          }
+        },
+      },
+    ]);
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -311,10 +334,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.logoutButton}
-            onPress={() => {
-              // Add logout functionality here
-              console.log("Logout pressed");
-            }}
+            onPress={handleLogout}
           >
             <MaterialIcons
               name="logout"
