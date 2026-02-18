@@ -81,11 +81,12 @@ export default function SignInScreen() {
     setIsLoading(true);
     try {
       if (isSignUp) {
-        console.log('[iDonate:SignIn] Starting signup flow', { email, fullName, bloodType, dateOfBirth });
+        console.log('[iDonate:SignIn] Starting signup flow', { email, fullName, bloodType, phoneNumber, dateOfBirth });
 
         const { error } = await signUp(email, password, {
           full_name: fullName,
           user_type: 'donor',
+          phone_number: phoneNumber,
         });
         if (error) {
           console.error('[iDonate:SignIn] signUp returned error', {
@@ -104,9 +105,8 @@ export default function SignInScreen() {
 
         // Create donor profile row with signup details
         console.log('[iDonate:SignIn] signUp succeeded, fetching user for donor profile...');
-        const { data: userData, error: getUserError } = await (
-          await import('@/lib/supabase')
-        ).supabase.auth.getUser();
+        const { supabase } = await import('@/lib/supabase');
+        const { data: userData, error: getUserError } = await supabase.auth.getUser();
 
         if (getUserError) {
           console.error('[iDonate:SignIn] getUser() failed after signUp', {
@@ -119,6 +119,24 @@ export default function SignInScreen() {
 
         const user = userData?.user;
         if (user) {
+          // Update profiles table with phone_number (trigger saves full_name & user_type)
+          console.log('[iDonate:SignIn] Updating profile with phone_number', { userId: user.id });
+          const { error: profileUpdateError } = await supabase
+            .from('profiles')
+            .update({ phone_number: phoneNumber || null })
+            .eq('id', user.id);
+
+          if (profileUpdateError) {
+            console.error('[iDonate:SignIn] profiles update failed', {
+              userId: user.id,
+              code: profileUpdateError.code,
+              message: profileUpdateError.message,
+              details: profileUpdateError.details,
+              hint: profileUpdateError.hint,
+            });
+          }
+
+          // Create donor row with blood_type and birth_date
           console.log('[iDonate:SignIn] Creating donor profile for user', { userId: user.id });
           const { error: profileError } = await upsertDonorProfile(user.id, {
             blood_type: bloodType || null,

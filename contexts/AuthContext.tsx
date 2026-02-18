@@ -86,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     ) {
         console.log('[iDonate:Auth] signUp attempt', {
             email,
-            metadata: { full_name: metadata.full_name, user_type: metadata.user_type },
+            metadata: { full_name: metadata.full_name, user_type: metadata.user_type, phone_number: metadata.phone_number },
         });
 
         const { data, error } = await supabase.auth.signUp({
@@ -96,6 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 data: {
                     full_name: metadata.full_name || '',
                     user_type: metadata.user_type || 'donor',
+                    phone_number: metadata.phone_number || '',
                 },
             },
         });
