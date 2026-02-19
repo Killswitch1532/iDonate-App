@@ -1,9 +1,10 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -17,7 +18,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { upsertDonorProfile } from "@/services/donorService";
 
 export default function SignInScreen() {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -30,6 +31,7 @@ export default function SignInScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const bloodTypes = ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"];
 
@@ -162,9 +164,8 @@ export default function SignInScreen() {
           console.warn('[iDonate:SignIn] No user returned after signUp — profile not created');
         }
 
-        Alert.alert('Success', 'Account created! Please check your email to verify.', [
-          { text: 'OK', onPress: () => router.replace('/(tabs)') },
-        ]);
+        // Signup complete — navigate to the app
+        router.replace('/(tabs)');
       } else {
         const { error } = await signIn(email, password);
         if (error) {
@@ -407,11 +408,20 @@ export default function SignInScreen() {
                   placeholderTextColor="#9AA4AB"
                   value={dateOfBirth}
                   onChangeText={(text) => {
-                    setDateOfBirth(text);
+                    // Auto-format: insert slashes at DD/ and DD/MM/ positions
+                    const digits = text.replace(/[^0-9]/g, '').slice(0, 8);
+                    let formatted = '';
+                    for (let i = 0; i < digits.length; i++) {
+                      if (i === 2 || i === 4) formatted += '/';
+                      formatted += digits[i];
+                    }
+                    setDateOfBirth(formatted);
                     if (errors.dateOfBirth) {
                       setErrors((prev) => ({ ...prev, dateOfBirth: "" }));
                     }
                   }}
+                  keyboardType="number-pad"
+                  maxLength={10}
                 />
               </View>
               {errors.dateOfBirth && (
@@ -540,20 +550,37 @@ export default function SignInScreen() {
 
           {/* Google Sign In */}
           <TouchableOpacity
-            style={styles.googleButton}
-            onPress={() => {
-              // Direct navigation to home screen for all platforms
-              router.push("/(tabs)");
+            style={[styles.googleButton, isGoogleLoading && { opacity: 0.7 }]}
+            disabled={isGoogleLoading || isLoading}
+            onPress={async () => {
+              setIsGoogleLoading(true);
+              try {
+                const { error } = await signInWithGoogle();
+                if (error) {
+                  Alert.alert('Google Sign-In Failed', error.message || 'Something went wrong');
+                  return;
+                }
+                // Auth state listener will pick up the session and navigate
+                router.replace('/(tabs)');
+              } catch (e: any) {
+                Alert.alert('Error', e?.message || 'Google sign-in failed');
+              } finally {
+                setIsGoogleLoading(false);
+              }
             }}
           >
-            <MaterialIcons
-              name="login"
-              size={20}
-              color="#4285F4"
-              style={styles.googleIcon}
-            />
+            {isGoogleLoading ? (
+              <ActivityIndicator color="#4285F4" style={{ marginRight: 8 }} />
+            ) : (
+              <MaterialIcons
+                name="login"
+                size={20}
+                color="#4285F4"
+                style={styles.googleIcon}
+              />
+            )}
             <ThemedText style={styles.googleText}>
-              Continue with Google
+              {isGoogleLoading ? 'Signing in...' : 'Continue with Google'}
             </ThemedText>
           </TouchableOpacity>
 

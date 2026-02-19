@@ -1,14 +1,18 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React from "react";
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function ProfileScreen() {
-  const { signOut } = useAuth();
+  const { signOut, profile, user } = useAuth();
+
+  const displayName = profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || 'User';
+  const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null;
+  const userType = profile?.user_type || 'donor';
 
   const handleLogout = () => {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
@@ -57,17 +61,24 @@ export default function ProfileScreen() {
           <View style={styles.profileCard}>
             <View style={styles.profileContent}>
               <View style={styles.avatarContainer}>
-                <MaterialIcons
-                  name="person"
-                  size={40}
-                  color="#FFFFFF"
-                  style={styles.avatarIcon}
-                />
+                {avatarUrl ? (
+                  <Image
+                    source={{ uri: avatarUrl }}
+                    style={styles.avatarImage}
+                  />
+                ) : (
+                  <MaterialIcons
+                    name="person"
+                    size={40}
+                    color="#FFFFFF"
+                    style={styles.avatarIcon}
+                  />
+                )}
               </View>
               <View style={styles.profileInfo}>
-                <ThemedText style={styles.userName}>Alex Johnson</ThemedText>
+                <ThemedText style={styles.userName}>{displayName}</ThemedText>
                 <ThemedText style={styles.userDetails}>
-                  O+ • Donor & Receiver
+                  {userType.charAt(0).toUpperCase() + userType.slice(1)}
                 </ThemedText>
               </View>
               <TouchableOpacity style={styles.editButton}>
@@ -422,6 +433,11 @@ const styles = StyleSheet.create({
   avatarIcon: {
     // Icon styling handled by MaterialIcons component
   },
+  avatarImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
   profileInfo: {
     flex: 1,
   },
@@ -553,9 +569,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 16,
   },
-  cardIcon: {
-    marginRight: 8,
-  },
+
   cardTitle: {
     fontSize: 16,
     fontWeight: "600",
