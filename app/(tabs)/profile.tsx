@@ -1,18 +1,41 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React from "react";
-import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { useAuth } from "@/contexts/AuthContext";
+import { getDonorProfile, DonorProfile } from "@/services/donorService";
 
 export default function ProfileScreen() {
   const { signOut, profile, user } = useAuth();
+  const [donorData, setDonorData] = useState<DonorProfile | null>(null);
+  const [donorLoading, setDonorLoading] = useState(true);
+
+  useEffect(() => {
+    if (user?.id) {
+      setDonorLoading(true);
+      getDonorProfile(user.id)
+        .then(({ data }) => setDonorData(data))
+        .finally(() => setDonorLoading(false));
+    } else {
+      setDonorLoading(false);
+    }
+  }, [user?.id]);
 
   const displayName = profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || 'User';
   const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null;
   const userType = profile?.user_type || 'donor';
+  const phoneNumber = profile?.phone_number || 'Not set';
+  const email = user?.email || 'Not set';
+  const address = donorData?.address || 'Not set';
+  const bloodType = donorData?.blood_type || null;
+
+  // Calculate days since last donation
+  const daysSinceLastDonation = donorData?.last_donation_date
+    ? Math.floor((Date.now() - new Date(donorData.last_donation_date).getTime()) / (1000 * 60 * 60 * 24))
+    : null;
 
   const handleLogout = () => {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
@@ -79,6 +102,7 @@ export default function ProfileScreen() {
                 <ThemedText style={styles.userName}>{displayName}</ThemedText>
                 <ThemedText style={styles.userDetails}>
                   {userType.charAt(0).toUpperCase() + userType.slice(1)}
+                  {bloodType ? ` • ${bloodType}` : ''}
                 </ThemedText>
               </View>
               <TouchableOpacity style={styles.editButton}>
@@ -104,7 +128,7 @@ export default function ProfileScreen() {
                 color="#E74C3C"
                 style={styles.cardIcon}
               />
-              <ThemedText style={styles.donationNumber}>6</ThemedText>
+              <ThemedText style={styles.donationNumber}>—</ThemedText>
               <ThemedText style={styles.donationLabel}>
                 Total Donations
               </ThemedText>
@@ -116,7 +140,7 @@ export default function ProfileScreen() {
                 color="#E74C3C"
                 style={styles.cardIcon}
               />
-              <ThemedText style={styles.livesSavedNumber}>3</ThemedText>
+              <ThemedText style={styles.livesSavedNumber}>—</ThemedText>
               <ThemedText style={styles.livesSavedLabel}>
                 Lives Saved
               </ThemedText>
@@ -128,7 +152,9 @@ export default function ProfileScreen() {
                 color="#4A90E2"
                 style={styles.cardIcon}
               />
-              <ThemedText style={styles.lastDonationNumber}>45</ThemedText>
+              <ThemedText style={styles.lastDonationNumber}>
+                {daysSinceLastDonation !== null ? daysSinceLastDonation : '—'}
+              </ThemedText>
               <ThemedText style={styles.lastDonationLabel}>Days Ago</ThemedText>
             </View>
           </View>
@@ -161,7 +187,7 @@ export default function ProfileScreen() {
                   <View style={styles.infoTextContainer}>
                     <ThemedText style={styles.infoLabel}>Phone</ThemedText>
                     <ThemedText style={styles.infoValue}>
-                      +1 202 555 0136
+                      {phoneNumber}
                     </ThemedText>
                   </View>
                 </View>
@@ -184,7 +210,7 @@ export default function ProfileScreen() {
                   <View style={styles.infoTextContainer}>
                     <ThemedText style={styles.infoLabel}>Email</ThemedText>
                     <ThemedText style={styles.infoValue}>
-                      alex.johnson@mail.com
+                      {email}
                     </ThemedText>
                   </View>
                 </View>
@@ -207,7 +233,7 @@ export default function ProfileScreen() {
                   <View style={styles.infoTextContainer}>
                     <ThemedText style={styles.infoLabel}>Location</ThemedText>
                     <ThemedText style={styles.infoValue}>
-                      Downtown, Central City
+                      {address}
                     </ThemedText>
                   </View>
                 </View>
@@ -236,64 +262,18 @@ export default function ProfileScreen() {
             </View>
 
             <View style={styles.historyItems}>
-              <View style={styles.historyItem}>
-                <View style={styles.historyItemContent}>
-                  <MaterialIcons
-                    name="water-drop"
-                    size={20}
-                    color="#E74C3C"
-                    style={styles.historyIcon}
-                  />
-                  <View style={styles.historyTextContainer}>
-                    <ThemedText style={styles.historyLabel}>
-                      Blood Donation
-                    </ThemedText>
-                    <ThemedText style={styles.historyValue}>
-                      Central City Hospital • 45 days ago
-                    </ThemedText>
-                  </View>
-                </View>
-                <ThemedText style={styles.historyStatus}>Completed</ThemedText>
-              </View>
-
-              <View style={styles.historyItem}>
-                <View style={styles.historyItemContent}>
-                  <MaterialIcons
-                    name="water-drop"
-                    size={20}
-                    color="#E74C3C"
-                    style={styles.historyIcon}
-                  />
-                  <View style={styles.historyTextContainer}>
-                    <ThemedText style={styles.historyLabel}>
-                      Blood Donation
-                    </ThemedText>
-                    <ThemedText style={styles.historyValue}>
-                      Metro Medical Center • 78 days ago
-                    </ThemedText>
-                  </View>
-                </View>
-                <ThemedText style={styles.historyStatus}>Completed</ThemedText>
-              </View>
-
-              <View style={styles.historyItem}>
-                <View style={styles.historyItemContent}>
-                  <MaterialIcons
-                    name="water-drop"
-                    size={20}
-                    color="#E74C3C"
-                    style={styles.historyIcon}
-                  />
-                  <View style={styles.historyTextContainer}>
-                    <ThemedText style={styles.historyLabel}>
-                      Blood Donation
-                    </ThemedText>
-                    <ThemedText style={styles.historyValue}>
-                      Sunrise Blood Bank • 112 days ago
-                    </ThemedText>
-                  </View>
-                </View>
-                <ThemedText style={styles.historyStatus}>Completed</ThemedText>
+              <View style={styles.emptyHistory}>
+                <MaterialIcons
+                  name="volunteer-activism"
+                  size={40}
+                  color="#BDC3C7"
+                />
+                <ThemedText style={styles.emptyHistoryText}>
+                  No donation history yet
+                </ThemedText>
+                <ThemedText style={styles.emptyHistorySubtext}>
+                  Your donations will appear here
+                </ThemedText>
               </View>
             </View>
           </View>
@@ -753,6 +733,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#FFFFFF",
+  },
+
+  // Empty History
+  emptyHistory: {
+    alignItems: "center",
+    paddingVertical: 24,
+  },
+  emptyHistoryText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#7F8C8D",
+    marginTop: 12,
+  },
+  emptyHistorySubtext: {
+    fontSize: 13,
+    color: "#BDC3C7",
+    marginTop: 4,
   },
 
   // Bottom spacer
