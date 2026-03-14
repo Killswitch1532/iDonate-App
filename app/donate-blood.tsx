@@ -74,19 +74,25 @@ export default function DonateBloodScreen() {
       const { latitude, longitude } = position.coords;
       setLocationCoords({ latitude, longitude });
 
-      // Reverse geocode to get a readable address
-      const [address] = await Location.reverseGeocodeAsync({ latitude, longitude });
+      // Default to coordinates
+      let displayText = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
 
-      if (address) {
-        const parts = [
-          address.street,
-          address.city || address.subregion,
-          address.region,
-        ].filter(Boolean);
-        setLocationText(parts.join(', ') || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
-      } else {
-        setLocationText(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+      // Try reverse geocoding (may fail if Google Play Services is unavailable)
+      try {
+        const [address] = await Location.reverseGeocodeAsync({ latitude, longitude });
+        if (address) {
+          const parts = [
+            address.street,
+            address.city || address.subregion,
+            address.region,
+          ].filter(Boolean);
+          if (parts.length > 0) displayText = parts.join(', ');
+        }
+      } catch (geoErr) {
+        console.warn('[iDonate:DonateBlood] Reverse geocode unavailable, using coordinates');
       }
+
+      setLocationText(displayText);
     } catch (err: any) {
       console.error('[iDonate:DonateBlood] Location error:', err);
       setLocationError('Could not detect location');

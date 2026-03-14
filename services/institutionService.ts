@@ -19,7 +19,7 @@ export async function getInstitutions() {
         .from('institutions')
         .select(`
             *,
-            profiles:id (
+            profiles!institutions_id_fkey (
                 user_type,
                 avatar_url
             )
@@ -39,7 +39,7 @@ export async function getInstitutionById(id: string) {
         .from('institutions')
         .select(`
             *,
-            profiles:id (
+            profiles!institutions_id_fkey (
                 full_name,
                 user_type,
                 avatar_url,
