@@ -58,7 +58,16 @@ export async function getDonorDonations(donorId: string) {
 
   const { data, error } = await supabase
     .from('donations')
-    .select('*, institutions(institution_name, address)')
+    .select(`
+      *,
+      institutions (
+        institution_name,
+        address,
+        profiles!institutions_id_fkey (
+          phone_number
+        )
+      )
+    `)
     .eq('donor_id', donorId)
     .order('scheduled_date', { ascending: false });
 
