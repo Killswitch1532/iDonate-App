@@ -70,11 +70,7 @@ export default function DonationsScreen() {
       
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <MaterialIcons name="arrow-back" size={24} color="#2C3E50" />
-        </TouchableOpacity>
         <ThemedText style={styles.headerTitle}>Donation History</ThemedText>
-        <View style={{ width: 40 }} /> {/* For centering */}
       </View>
 
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
@@ -188,18 +184,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F4F4',
   },
   header: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E8E8E8',
-  },
-  backButton: {
-    padding: 8,
-    marginLeft: -8,
   },
   headerTitle: {
     fontSize: 18,

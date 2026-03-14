@@ -288,7 +288,7 @@ export default function ProfileScreen() {
                 <ThemedText style={styles.cardTitle}>Recent Donations</ThemedText>
               </View>
               {donations.length > 0 && (
-                <TouchableOpacity onPress={() => router.push('/donations')}>
+                <TouchableOpacity onPress={() => router.navigate('/(tabs)/donations')}>
                   <ThemedText style={styles.viewAllText}>View All</ThemedText>
                 </TouchableOpacity>
               )}

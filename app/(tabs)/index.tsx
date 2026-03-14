@@ -16,16 +16,28 @@ export default function HomeScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <MaterialIcons
-              name="favorite"
-              size={24}
-              color="#E74C3C"
-              style={styles.heartIcon}
-            />
-            <ThemedText type="logo" style={styles.logoText}>
-              iDonate
-            </ThemedText>
+          <View style={styles.headerTopRow}>
+            <View style={styles.logoContainer}>
+              <MaterialIcons
+                name="favorite"
+                size={24}
+                color="#E74C3C"
+                style={styles.heartIcon}
+              />
+              <ThemedText type="logo" style={styles.logoText}>
+                iDonate
+              </ThemedText>
+            </View>
+
+            <TouchableOpacity
+              style={styles.notificationButton}
+              onPress={() => router.push("/notifications")}
+            >
+              <MaterialIcons name="notifications-none" size={28} color="#2C3E50" />
+              <View style={styles.notificationBadge}>
+                <ThemedText style={styles.badgeText}>2</ThemedText>
+              </View>
+            </TouchableOpacity>
           </View>
           <ThemedText style={styles.tagline}>
             Care. Connect. Save lives.
@@ -271,14 +283,20 @@ const styles = StyleSheet.create({
 
   // Header styles
   header: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 24,
+    backgroundColor: "#F8F4F4",
+  },
+  headerTopRow: {
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 24,
-    paddingTop: 24,
+    justifyContent: "space-between",
+    marginBottom: 8,
   },
   logoContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8,
   },
   heartIcon: {
     marginRight: 8,
@@ -288,6 +306,28 @@ const styles = StyleSheet.create({
     lineHeight: 34,
     fontWeight: "bold",
     color: "#2C3E50",
+  },
+  notificationButton: {
+    position: 'relative',
+    padding: 4,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: '#E74C3C',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#F8F4F4',
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   tagline: {
     fontSize: 14,
