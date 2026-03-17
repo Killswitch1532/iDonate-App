@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { MaterialIcons } from '@expo/vector-icons';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -80,10 +81,10 @@ export default function TabLayout() {
         options={{
           title: 'Donations',
           tabBarIcon: ({ color, focused }) => (
-            <IconSymbol 
-              size={24} 
-              name={focused ? "list.bullet.clipboard.fill" : "list.bullet.clipboard"} 
-              color={color} 
+            <MaterialIcons
+              name="water-drop"
+              size={24}
+              color={color}
             />
           ),
         }}
