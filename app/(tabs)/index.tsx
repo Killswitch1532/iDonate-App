@@ -1,13 +1,75 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React from "react";
-import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import * as Location from "expo-location";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import { useAuth } from "@/contexts/AuthContext";
+import { getDonorProfile } from "@/services/donorService";
+import { getNearbyInstitutionCount } from "@/services/institutionService";
+
 export default function HomeScreen() {
+  const { user } = useAuth();
+
+  const [bloodType, setBloodType] = useState<string | null>(null);
+  const [nearbyCenters, setNearbyCenters] = useState<{ count: number; radiusKm: number } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchData() {
+      setLoading(true);
+
+      // Fetch blood type
+      const bloodTypePromise = (async () => {
+        if (!user?.id) return;
+        const { data } = await getDonorProfile(user.id);
+        if (!cancelled && data?.blood_type) {
+          setBloodType(data.blood_type);
+        }
+      })();
+
+      // Fetch nearby centers
+      const nearbyPromise = (async () => {
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== "granted") {
+            console.log("[iDonate:Home] Location permission denied");
+            return;
+          }
+          const loc = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          const result = await getNearbyInstitutionCount(
+            loc.coords.latitude,
+            loc.coords.longitude
+          );
+          if (!cancelled && !result.error) {
+            setNearbyCenters({ count: result.count, radiusKm: result.radiusKm });
+          }
+        } catch (e) {
+          console.error("[iDonate:Home] Nearby centers error", e);
+        }
+      })();
+
+      await Promise.all([bloodTypePromise, nearbyPromise]);
+      if (!cancelled) setLoading(false);
+    }
+
+    fetchData();
+    return () => { cancelled = true; };
+  }, [user?.id]);
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -105,7 +167,15 @@ export default function HomeScreen() {
                 color="#7F8C8D"
                 style={styles.summaryIcon}
               />
-              <ThemedText style={styles.summaryText}>5 within 5km</ThemedText>
+              {loading ? (
+                <ActivityIndicator size="small" color="#7F8C8D" />
+              ) : (
+                <ThemedText style={styles.summaryText}>
+                  {nearbyCenters
+                    ? `${nearbyCenters.count} within ${nearbyCenters.radiusKm}km`
+                    : "—"}
+                </ThemedText>
+              )}
             </View>
           </View>
           <View style={styles.summaryCard}>
@@ -117,7 +187,13 @@ export default function HomeScreen() {
                 color="#E74C3C"
                 style={styles.summaryIcon}
               />
-              <ThemedText style={styles.summaryText}>O+</ThemedText>
+              {loading ? (
+                <ActivityIndicator size="small" color="#E74C3C" />
+              ) : (
+                <ThemedText style={styles.summaryText}>
+                  {bloodType ?? "Not set"}
+                </ThemedText>
+              )}
             </View>
           </View>
         </View>
