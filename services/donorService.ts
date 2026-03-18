@@ -23,7 +23,7 @@ export async function getDonorProfile(userId: string) {
         .from('donors')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
     if (error) {
         console.error('[iDonate:DonorService] getDonorProfile failed', {
