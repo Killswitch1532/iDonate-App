@@ -118,7 +118,7 @@ export default function ProfileScreen() {
           <SafeAreaView edges={['top']} style={styles.safeAreaTop}>
             <View style={styles.header}>
               <ThemedText style={styles.headerTitle}>Profile</ThemedText>
-              <TouchableOpacity style={styles.headerEditBtn}>
+              <TouchableOpacity style={styles.headerEditBtn} onPress={() => router.push('/edit-profile')}>
                 <MaterialIcons name="edit" size={20} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
