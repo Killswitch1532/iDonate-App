@@ -181,3 +181,28 @@ export async function getNearbyInstitutionCount(
 
     return { count: nearbyCount, radiusKm, error: null };
 }
+
+/**
+ * Get nearby institutions with full details and distance.
+ */
+export async function getNearbyInstitutions(
+    userLat: number,
+    userLon: number,
+    radiusKm: number = 10
+): Promise<{ data: Array<Institution & { distance: number }> | null; error: any }> {
+    const { data, error } = await getInstitutions();
+    if (error || !data) return { data: null, error };
+
+    const results = data
+        .map((inst: any) => {
+            const parsed = extractCoords(inst.location);
+            if (!parsed) return null;
+            const distance = getHaversineDistance(userLat, userLon, parsed.lat, parsed.lng);
+            if (distance > radiusKm) return null;
+            return { ...inst, distance: Math.round(distance * 10) / 10 };
+        })
+        .filter(Boolean)
+        .sort((a: any, b: any) => a.distance - b.distance);
+
+    return { data: results, error: null };
+}

@@ -6,13 +6,13 @@ import {
 } from "@react-navigation/native";
 import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import "react-native-reanimated";
-import * as Notifications from 'expo-notifications';
 
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { setupNotificationListeners } from "@/services/notificationService";
 
 export const unstable_settings = {
   anchor: "(tabs)",
@@ -56,16 +56,15 @@ function RootLayoutNav() {
     }
   }, [appIsReady, loading, user]);
 
-  // Handle notification taps → navigate to donate-blood
+  // Handle notification taps → navigate to donate-blood (safe in Expo Go)
   useEffect(() => {
-    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
-      const data = response.notification.request.content.data;
-      console.log('[iDonate:Notifications] Tapped notification', data);
+    let cleanup: (() => void) | undefined;
+    setupNotificationListeners((data) => {
       if (data?.requestId) {
         router.push('/donate-blood');
       }
-    });
-    return () => subscription.remove();
+    }).then(fn => { cleanup = fn; });
+    return () => cleanup?.();
   }, []);
 
   if (!appIsReady || loading) {

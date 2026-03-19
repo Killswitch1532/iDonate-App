@@ -16,13 +16,30 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import { useAuth } from "@/contexts/AuthContext";
 import { getDonorProfile } from "@/services/donorService";
-import { getNearbyInstitutionCount } from "@/services/institutionService";
+import { getNearbyInstitutionCount, getNearbyInstitutions } from "@/services/institutionService";
+import { getActiveRequests } from "@/services/requestService";
+import { getDonorDonations } from "@/services/donationService";
+
+function getTimeAgo(dateStr: string): string {
+  const now = Date.now();
+  const diff = now - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
 
 export default function HomeScreen() {
   const { user } = useAuth();
 
   const [bloodType, setBloodType] = useState<string | null>(null);
   const [nearbyCenters, setNearbyCenters] = useState<{ count: number; radiusKm: number } | null>(null);
+  const [nearbyInstitutions, setNearbyInstitutions] = useState<any[]>([]);
+  const [requests, setRequests] = useState<any[]>([]);
+  const [donations, setDonations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,30 +57,50 @@ export default function HomeScreen() {
         }
       })();
 
+      // Fetch active requests
+      const requestsPromise = (async () => {
+        try {
+          const { data } = await getActiveRequests();
+          if (!cancelled && data) setRequests(data.slice(0, 5));
+        } catch (e) {
+          console.error('[iDonate:Home] Requests error', e);
+        }
+      })();
+
+      // Fetch user's donations
+      const donationsPromise = (async () => {
+        if (!user?.id) return;
+        try {
+          const { data } = await getDonorDonations(user.id);
+          if (!cancelled && data) {
+            const upcoming = data.filter((d: any) => d.status === 'scheduled' || d.status === 'confirmed');
+            setDonations(upcoming.slice(0, 3));
+          }
+        } catch (e) {
+          console.error('[iDonate:Home] Donations error', e);
+        }
+      })();
+
       // Fetch nearby centers
       const nearbyPromise = (async () => {
         try {
           const { status } = await Location.requestForegroundPermissionsAsync();
-          if (status !== "granted") {
-            console.log("[iDonate:Home] Location permission denied");
-            return;
-          }
-          const loc = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          });
-          const result = await getNearbyInstitutionCount(
-            loc.coords.latitude,
-            loc.coords.longitude
-          );
-          if (!cancelled && !result.error) {
-            setNearbyCenters({ count: result.count, radiusKm: result.radiusKm });
+          if (status !== "granted") return;
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          const [countResult, listResult] = await Promise.all([
+            getNearbyInstitutionCount(loc.coords.latitude, loc.coords.longitude),
+            getNearbyInstitutions(loc.coords.latitude, loc.coords.longitude, 10),
+          ]);
+          if (!cancelled) {
+            if (!countResult.error) setNearbyCenters({ count: countResult.count, radiusKm: countResult.radiusKm });
+            if (listResult.data) setNearbyInstitutions(listResult.data.slice(0, 5));
           }
         } catch (e) {
-          console.error("[iDonate:Home] Nearby centers error", e);
+          console.error('[iDonate:Home] Nearby centers error', e);
         }
       })();
 
-      await Promise.all([bloodTypePromise, nearbyPromise]);
+      await Promise.all([bloodTypePromise, requestsPromise, donationsPromise, nearbyPromise]);
       if (!cancelled) setLoading(false);
     }
 
@@ -198,62 +235,59 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Your Requests Section */}
+        {/* Active Blood Requests */}
         <View style={styles.sectionHeader}>
-          <ThemedText style={styles.sectionTitle}>Your requests</ThemedText>
+          <ThemedText style={styles.sectionTitle}>Blood requests</ThemedText>
           <TouchableOpacity
             style={styles.requestsButton}
             onPress={() => router.push("/requests")}
           >
-            <ThemedText style={styles.requestsButtonText}>Requests</ThemedText>
+            <ThemedText style={styles.requestsButtonText}>View all</ThemedText>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.requestCard}>
-          <View style={styles.requestRow}>
-            <View style={styles.avatar}>
-              <MaterialIcons
-                name="person"
-                size={24}
-                color="#FFFFFF"
-                style={styles.avatarIcon}
-              />
-            </View>
-            <View style={styles.requestContent}>
-              <ThemedText style={styles.requestTitle}>Pending match</ThemedText>
-              <ThemedText style={styles.requestSubtitle}>
-                A+ • 2km away • Posted 1h ago
-              </ThemedText>
-            </View>
-            <View style={styles.matchingStatus}>
-              <ThemedText style={styles.statusText}>Matching</ThemedText>
-            </View>
+        {loading ? (
+          <ActivityIndicator size="small" color="#E74C3C" style={{ marginBottom: 16 }} />
+        ) : requests.length === 0 ? (
+          <View style={styles.requestCard}>
+            <ThemedText style={{ color: '#7F8C8D', textAlign: 'center', padding: 8 }}>
+              No active requests right now
+            </ThemedText>
           </View>
-        </View>
-
-        <View style={styles.requestCard}>
-          <View style={styles.requestRow}>
-            <View style={styles.avatar}>
-              <MaterialIcons
-                name="person"
-                size={24}
-                color="#FFFFFF"
-                style={styles.avatarIcon}
-              />
-            </View>
-            <View style={styles.requestContent}>
-              <ThemedText style={styles.requestTitle}>
-                Upcoming donation
-              </ThemedText>
-              <ThemedText style={styles.requestSubtitle}>
-                O+ • City Hospital • Tomorrow 10:00
-              </ThemedText>
-            </View>
-            <View style={styles.scheduledStatus}>
-              <ThemedText style={styles.statusText}>Scheduled</ThemedText>
-            </View>
-          </View>
-        </View>
+        ) : (
+          <>
+            {requests.map((req: any) => {
+              const urgencyColors: Record<string, string> = {
+                critical: '#E74C3C', high: '#E67E22', moderate: '#F1C40F', low: '#27AE60',
+              };
+              const timeAgo = getTimeAgo(req.created_at);
+              return (
+                <View key={req.id} style={styles.requestCard}>
+                  <View style={styles.requestRow}>
+                    <View style={[styles.avatar, { backgroundColor: urgencyColors[req.urgency_level] || '#E74C3C' }]}>
+                      <ThemedText style={{ color: '#FFF', fontWeight: 'bold', fontSize: 14 }}>
+                        {req.blood_type_needed}
+                      </ThemedText>
+                    </View>
+                    <View style={styles.requestContent}>
+                      <ThemedText style={styles.requestTitle}>
+                        {req.blood_type_needed} · {req.units_needed} unit{req.units_needed > 1 ? 's' : ''}
+                      </ThemedText>
+                      <ThemedText style={styles.requestSubtitle}>
+                        {req.profiles?.full_name || 'Anonymous'} · {timeAgo}
+                      </ThemedText>
+                    </View>
+                    <View style={[styles.matchingStatus, { backgroundColor: urgencyColors[req.urgency_level] + '20' }]}>
+                      <ThemedText style={[styles.statusText, { color: urgencyColors[req.urgency_level] }]}>
+                        {req.urgency_level}
+                      </ThemedText>
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+          </>
+        )}
 
         {/* Nearby Donation Centers */}
         <View style={styles.mapSection}>
@@ -261,50 +295,43 @@ export default function HomeScreen() {
             <ThemedText style={styles.sectionTitle}>
               Nearby donation centers
             </ThemedText>
-            <TouchableOpacity style={styles.filterButton}>
-              <MaterialIcons
-                name="filter-list"
-                size={16}
-                color="#7F8C8D"
-                style={styles.filterIcon}
-              />
-              <ThemedText style={styles.filterText}>Filters</ThemedText>
-            </TouchableOpacity>
           </View>
 
-          <View style={styles.mapPlaceholder}>
-            <ThemedText style={styles.mapText}>Map View</ThemedText>
-          </View>
-
-          <View style={styles.mapButtons}>
-            <TouchableOpacity style={styles.mapButton}>
-              <MaterialIcons
-                name="local-hospital"
-                size={20}
-                color="#4A90E2"
-                style={styles.mapButtonIcon}
-              />
-              <ThemedText style={styles.mapButtonText}>Hospitals</ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.mapButton}>
-              <MaterialIcons
-                name="water-drop"
-                size={20}
-                color="#E74C3C"
-                style={styles.mapButtonIcon}
-              />
-              <ThemedText style={styles.mapButtonText}>Blood banks</ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.mapButton}>
-              <MaterialIcons
-                name="location-on"
-                size={20}
-                color="#27AE60"
-                style={styles.mapButtonIcon}
-              />
-              <ThemedText style={styles.mapButtonText}>Near me</ThemedText>
-            </TouchableOpacity>
-          </View>
+          {loading ? (
+            <ActivityIndicator size="small" color="#7F8C8D" style={{ marginVertical: 20 }} />
+          ) : nearbyInstitutions.length === 0 ? (
+            <View style={styles.mapPlaceholder}>
+              <MaterialIcons name="location-off" size={32} color="#BDC3C7" />
+              <ThemedText style={[styles.mapText, { marginTop: 8 }]}>No institutions found nearby</ThemedText>
+            </View>
+          ) : (
+            nearbyInstitutions.map((inst: any) => (
+              <TouchableOpacity
+                key={inst.id}
+                style={styles.institutionCard}
+                onPress={() => { /* TODO: navigate to institution detail */ }}
+              >
+                <View style={styles.institutionIconWrap}>
+                  <MaterialIcons
+                    name={inst.institution_type === 'blood_bank' ? 'water-drop' : 'local-hospital'}
+                    size={24}
+                    color={inst.institution_type === 'blood_bank' ? '#E74C3C' : '#4A90E2'}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <ThemedText style={styles.institutionName}>{inst.institution_name}</ThemedText>
+                  <ThemedText style={styles.institutionDetail}>
+                    {inst.address || 'No address'} · {inst.distance} km away
+                  </ThemedText>
+                </View>
+                <View style={styles.institutionTypeBadge}>
+                  <ThemedText style={styles.institutionTypeText}>
+                    {inst.institution_type === 'blood_bank' ? 'Blood Bank' : 'Hospital'}
+                  </ThemedText>
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
 
           <View style={styles.liveIndicator}>
             <View style={styles.liveDot} />
@@ -689,6 +716,52 @@ const styles = StyleSheet.create({
   liveText: {
     fontSize: 12,
     color: "#7F8C8D",
+  },
+
+  // Institution cards
+  institutionCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  institutionIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#F0F4F8",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  institutionName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#2C3E50",
+    marginBottom: 2,
+  },
+  institutionDetail: {
+    fontSize: 12,
+    color: "#7F8C8D",
+  },
+  institutionTypeBadge: {
+    backgroundColor: "#F0F4F8",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginLeft: 8,
+  },
+  institutionTypeText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "#4A90E2",
   },
 
   // Blood compatibility
