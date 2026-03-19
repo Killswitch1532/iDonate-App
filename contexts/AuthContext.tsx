@@ -3,6 +3,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import { registerForPushNotifications, savePushToken, clearPushToken } from '@/services/notificationService';
 
 type AuthContextType = {
     session: Session | null;
@@ -62,6 +63,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                 .update({ avatar_url: avatarUrl })
                                 .eq('id', session.user.id);
                         }
+
+                        // Register for push notifications
+                        registerForPushNotifications().then(token => {
+                            if (token) savePushToken(session.user.id, token);
+                        });
                     }
                 } else {
                     setProfile(null);
@@ -229,6 +235,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     async function signOut() {
+        if (user?.id) await clearPushToken(user.id);
         await supabase.auth.signOut();
     }
 

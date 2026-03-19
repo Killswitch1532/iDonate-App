@@ -6,9 +6,10 @@ import {
 } from "@react-navigation/native";
 import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import "react-native-reanimated";
+import * as Notifications from 'expo-notifications';
 
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
@@ -54,6 +55,18 @@ function RootLayoutNav() {
       router.replace('/onboarding');
     }
   }, [appIsReady, loading, user]);
+
+  // Handle notification taps → navigate to donate-blood
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+      const data = response.notification.request.content.data;
+      console.log('[iDonate:Notifications] Tapped notification', data);
+      if (data?.requestId) {
+        router.push('/donate-blood');
+      }
+    });
+    return () => subscription.remove();
+  }, []);
 
   if (!appIsReady || loading) {
     return (
