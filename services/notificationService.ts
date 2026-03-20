@@ -1,6 +1,6 @@
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
 import { supabase } from '@/lib/supabase';
 
 /**
@@ -18,12 +18,14 @@ export async function registerForPushNotifications(): Promise<string | null> {
   // Push notifications are not supported in Expo Go since SDK 53
   if (isExpoGo()) {
     console.log('[iDonate:Notifications] Running in Expo Go — push notifications skipped');
+    Alert.alert('Push Not Supported', 'Push notifications do not work in Expo Go. Please use your Development Build.');
     return null;
   }
 
   // Push only works on physical devices
   if (!Device.isDevice) {
     console.log('[iDonate:Notifications] Not a physical device, skipping push registration');
+    Alert.alert('Device Required', 'Push notifications require a physical device.');
     return null;
   }
 
@@ -51,6 +53,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
 
     if (finalStatus !== 'granted') {
       console.log('[iDonate:Notifications] Permission not granted');
+      Alert.alert('Permission Denied', 'You need to allow notifications for this to work.');
       return null;
     }
 
@@ -61,19 +64,19 @@ export async function registerForPushNotifications(): Promise<string | null> {
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#FF0000',
-        sound: 'default',
       });
     }
 
     // Get Expo push token
     const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: undefined, // Uses the projectId from app.json automatically
+      projectId: Constants.expoConfig?.extra?.eas?.projectId || '8778c660-6c82-48ba-8e6a-fe609274d28f',
     });
     const token = tokenData.data;
     console.log('[iDonate:Notifications] Push token:', token);
     return token;
-  } catch (error) {
+  } catch (error: any) {
     console.warn('[iDonate:Notifications] Push registration failed (expected in Expo Go):', error);
+    Alert.alert('Push Registration Failed', `Error: ${error.message}`);
     return null;
   }
 }
@@ -113,8 +116,10 @@ export async function savePushToken(userId: string, token: string): Promise<void
 
   if (error) {
     console.error('[iDonate:Notifications] Failed to save push token:', error.message);
+    Alert.alert('Push Token Error', `Failed to save to database: ${error.message}`);
   } else {
     console.log('[iDonate:Notifications] Push token saved');
+    Alert.alert('Push Token Success', 'Your device is now registered for notifications!');
   }
 }
 

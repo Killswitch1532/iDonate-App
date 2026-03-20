@@ -19,7 +19,9 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.henry33y.idonate",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",
@@ -47,6 +49,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "8778c660-6c82-48ba-8e6a-fe609274d28f"
+      }
     }
   }
 }

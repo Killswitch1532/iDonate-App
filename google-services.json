@@ -1,0 +1,90 @@
+{
+  "project_info": {
+    "project_number": "655086831488",
+    "project_id": "idonate-c030e",
+    "storage_bucket": "idonate-c030e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:655086831488:android:fb0e473c117e2890a9e365",
+        "android_client_info": {
+          "package_name": "com.example.idonate"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "655086831488-r2qavq53tonkmqk6gm2ksa9d3uu7uk2r.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.idonate",
+            "certificate_hash": "1b0c97c1cc407c917ecb25f647049a0375716b24"
+          }
+        },
+        {
+          "client_id": "655086831488-5kqeg9he2a1pfuni6q7ufh29ndvlmv2v.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAaangDOqoYGZ9YlZ-7IE0TO3vGFAWddZw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "655086831488-5kqeg9he2a1pfuni6q7ufh29ndvlmv2v.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "655086831488-5itv5i83jhl9p7hmgd2if7dbrvje5mt6.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.idonate"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:655086831488:android:86ebe544cb59c875a9e365",
+        "android_client_info": {
+          "package_name": "com.henry33y.idonate"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "655086831488-5kqeg9he2a1pfuni6q7ufh29ndvlmv2v.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAaangDOqoYGZ9YlZ-7IE0TO3vGFAWddZw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "655086831488-5kqeg9he2a1pfuni6q7ufh29ndvlmv2v.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "655086831488-5itv5i83jhl9p7hmgd2if7dbrvje5mt6.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.idonate"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

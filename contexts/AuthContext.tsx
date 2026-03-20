@@ -40,6 +40,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(session?.user ?? null);
             if (session?.user) {
                 fetchProfile(session.user.id);
+                // Register for push notifications on app start if session exists
+                registerForPushNotifications().then(token => {
+                    if (token) savePushToken(session.user.id, token);
+                });
             }
             setLoading(false);
         });
@@ -64,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                 .eq('id', session.user.id);
                         }
 
-                        // Register for push notifications
+                        // Register for push notifications on sign-in
                         registerForPushNotifications().then(token => {
                             if (token) savePushToken(session.user.id, token);
                         });
