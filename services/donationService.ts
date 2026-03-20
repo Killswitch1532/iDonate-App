@@ -66,6 +66,9 @@ export async function getDonorDonations(donorId: string) {
         profiles!institutions_id_fkey (
           phone_number
         )
+      ),
+      blood_requests (
+        blood_type_needed
       )
     `)
     .eq('donor_id', donorId)

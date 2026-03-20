@@ -39,6 +39,8 @@ export async function registerForPushNotifications(): Promise<string | null> {
         shouldShowAlert: true,
         shouldPlaySound: true,
         shouldSetBadge: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
       }),
     });
 
@@ -93,7 +95,7 @@ export async function setupNotificationListeners(
   try {
     const Notifications = await import('expo-notifications');
     const subscription = Notifications.addNotificationResponseReceivedListener(response => {
-      const data = response.notification.request.content.data;
+      const data = response.notification.request.content.data || {};
       console.log('[iDonate:Notifications] Tapped notification', data);
       onTap(data);
     });
@@ -136,3 +138,65 @@ export async function clearPushToken(userId: string): Promise<void> {
     console.error('[iDonate:Notifications] Failed to clear push token:', error.message);
   }
 }
+
+/**
+ * DATABASE BACKED NOTIFICATIONS
+ */
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  message: string;
+  data: any;
+  is_read: boolean;
+  created_at: string;
+}
+
+export const getNotifications = async (userId: string) => {
+  return await supabase
+    .from('notifications')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+};
+
+export const getUnreadCount = async (userId: string) => {
+  const { count, error } = await supabase
+    .from('notifications')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('is_read', false);
+  
+  return { count: count || 0, error };
+};
+
+export const markAsRead = async (notificationId: string) => {
+  return await supabase
+    .from('notifications')
+    .update({ is_read: true })
+    .eq('id', notificationId);
+};
+
+export const markAllAsRead = async (userId: string) => {
+  return await supabase
+    .from('notifications')
+    .update({ is_read: true })
+    .eq('user_id', userId)
+    .eq('is_read', false);
+};
+
+export const deleteNotification = async (notificationId: string) => {
+  return await supabase
+    .from('notifications')
+    .delete()
+    .eq('id', notificationId);
+};
+
+export const clearAllNotifications = async (userId: string) => {
+  return await supabase
+    .from('notifications')
+    .delete()
+    .eq('user_id', userId);
+};

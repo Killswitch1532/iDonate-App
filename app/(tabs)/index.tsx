@@ -15,6 +15,7 @@ import { ThemedText } from "@/components/themed-text";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNotifications } from "@/contexts/NotificationContext";
 import { getDonorProfile } from "@/services/donorService";
 import { getNearbyInstitutionCount, getNearbyInstitutions } from "@/services/institutionService";
 import { getActiveRequests } from "@/services/requestService";
@@ -34,6 +35,7 @@ function getTimeAgo(dateStr: string): string {
 
 export default function HomeScreen() {
   const { user } = useAuth();
+  const { unreadCount } = useNotifications();
 
   const [bloodType, setBloodType] = useState<string | null>(null);
   const [nearbyCenters, setNearbyCenters] = useState<{ count: number; radiusKm: number } | null>(null);
@@ -133,9 +135,11 @@ export default function HomeScreen() {
               onPress={() => router.push("/notifications")}
             >
               <MaterialIcons name="notifications-none" size={28} color="#2C3E50" />
-              <View style={styles.notificationBadge}>
-                <ThemedText style={styles.badgeText}>2</ThemedText>
-              </View>
+              {unreadCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <ThemedText style={styles.badgeText}>{unreadCount}</ThemedText>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
           <ThemedText style={styles.tagline}>

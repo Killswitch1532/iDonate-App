@@ -12,6 +12,7 @@ import "react-native-reanimated";
 
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 import { setupNotificationListeners } from "@/services/notificationService";
 
 export const unstable_settings = {
@@ -21,7 +22,9 @@ export const unstable_settings = {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootLayoutNav />
+      <NotificationProvider>
+        <RootLayoutNav />
+      </NotificationProvider>
     </AuthProvider>
   );
 }
@@ -61,7 +64,11 @@ function RootLayoutNav() {
     let cleanup: (() => void) | undefined;
     setupNotificationListeners((data) => {
       if (data?.requestId) {
-        router.push('/donate-blood');
+        // Use object syntax to avoid type errors with dynamic routes
+        router.push({
+          pathname: '/blood-request/[id]',
+          params: { id: data.requestId }
+        } as any);
       }
     }).then(fn => { cleanup = fn; });
     return () => cleanup?.();

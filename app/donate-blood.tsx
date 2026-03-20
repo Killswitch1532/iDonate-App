@@ -11,12 +11,17 @@ let MapView: any = null;
 let Marker: any = null;
 let mapsAvailable = false;
 try {
+  // Use try/catch to gracefully handle the absence of native modules (Expo Go)
   const maps = require('react-native-maps');
-  MapView = maps.default;
-  Marker = maps.Marker;
-  mapsAvailable = true;
-} catch {
-  // Native module not available (Expo Go)
+  if (maps) {
+    // MapView is generally the default export, but we check common patterns
+    MapView = maps.default || maps.MapView || maps;
+    Marker = maps.Marker;
+    // Only mark as available if we actually got the components needed
+    mapsAvailable = !!MapView && !!Marker;
+  }
+} catch (e) {
+  console.log('[iDonate:DonateBlood] Maps module not available, falling back to static view');
 }
 
 import { ThemedText } from '@/components/themed-text';
@@ -259,7 +264,7 @@ export default function DonateBloodScreen() {
 
               {/* Interactive Map */}
               <View style={styles.mapContainer}>
-                {locationCoords && mapsAvailable ? (
+                {locationCoords && mapsAvailable && MapView && Marker ? (
                   <MapView
                     style={styles.map}
                     initialRegion={{
@@ -286,7 +291,7 @@ export default function DonateBloodScreen() {
                             }}
                             title={center.institution_name}
                             description={center.address || ''}
-                            pinColor={center.profiles?.user_type === 'blood_bank' ? '#E74C3C' : '#4A90E2'}
+                            pinColor={(center as any).profiles?.user_type === 'blood_bank' ? '#E74C3C' : '#4A90E2'}
                           />
                         );
                       })}

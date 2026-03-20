@@ -1,8 +1,8 @@
-import { MaterialIcons } from "@expo/vector-icons";
-import { router, Stack } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, View, TouchableOpacity, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { router, Stack } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 
 import { ThemedText } from "@/components/themed-text";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,6 +12,7 @@ export default function DonationsScreen() {
   const { user } = useAuth();
   const [donations, setDonations] = useState<Donation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeFilter, setActiveFilter] = useState('all');
   const [cancelingId, setCancelingId] = useState<string | null>(null);
 
   const loadDonations = () => {
@@ -28,6 +29,12 @@ export default function DonationsScreen() {
   useEffect(() => {
     loadDonations();
   }, [user?.id]);
+
+  const filteredDonations = donations.filter(d => {
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'pending') return d.status === 'scheduled' || d.status === 'confirmed';
+    return d.status === activeFilter;
+  });
 
   const handleCancel = (donationId: string) => {
     Alert.alert(
@@ -55,12 +62,12 @@ export default function DonationsScreen() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'scheduled': return { bg: '#E8F4FD', text: '#4A90E2' };
-      case 'confirmed': return { bg: '#FFF3CD', text: '#F39C12' };
-      case 'completed': return { bg: '#E8F5E8', text: '#27AE60' };
-      case 'cancelled': return { bg: '#FDE8E8', text: '#E74C3C' };
-      case 'no_show': return { bg: '#F0F0F0', text: '#7F8C8D' };
-      default: return { bg: '#F0F0F0', text: '#7F8C8D' };
+      case 'scheduled': return { bg: '#DBEAFE', text: '#2563EB', icon: 'calendar-outline' };
+      case 'confirmed': return { bg: '#FEF3C7', text: '#D97706', icon: 'checkmark-circle-outline' };
+      case 'completed': return { bg: '#DCFCE7', text: '#16A34A', icon: 'ribbon-outline' };
+      case 'cancelled': return { bg: '#FEE2E2', text: '#DC2626', icon: 'close-circle-outline' };
+      case 'no_show': return { bg: '#F1F5F9', text: '#64748B', icon: 'help-circle-outline' };
+      default: return { bg: '#F1F5F9', text: '#64748B', icon: 'ellipse-outline' };
     }
   };
 
@@ -70,103 +77,133 @@ export default function DonationsScreen() {
       
       {/* Header */}
       <View style={styles.header}>
-        <ThemedText style={styles.headerTitle}>Donation History</ThemedText>
+        <ThemedText style={styles.headerTitle}>My Donations</ThemedText>
+        <TouchableOpacity onPress={loadDonations} style={styles.refreshBtn}>
+          <Ionicons name="refresh" size={20} color="#64748B" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Filters */}
+      <View style={styles.filterSection}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContainer}>
+          {['all', 'pending', 'completed', 'cancelled'].map(filter => (
+            <TouchableOpacity 
+              key={filter} 
+              onPress={() => setActiveFilter(filter)}
+              style={[
+                styles.filterTab, 
+                activeFilter === filter && styles.activeFilterTab
+              ]}
+            >
+              <ThemedText style={[
+                styles.filterTabText, 
+                activeFilter === filter && styles.activeFilterTabText
+              ]}>
+                {filter.charAt(0).toUpperCase() + filter.slice(1)}
+              </ThemedText>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
         {loading ? (
           <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color="#4A90E2" />
+            <ActivityIndicator size="large" color="#DC2626" />
           </View>
-        ) : donations.length === 0 ? (
+        ) : filteredDonations.length === 0 ? (
           <View style={styles.centerContainer}>
-            <MaterialIcons name="volunteer-activism" size={60} color="#BDC3C7" style={styles.emptyIcon} />
-            <ThemedText style={styles.emptyText}>No donation history yet</ThemedText>
-            <ThemedText style={styles.emptySubtext}>Your past and upcoming donations will appear here.</ThemedText>
-            <TouchableOpacity style={styles.donateButton} onPress={() => router.push('/donate-blood')}>
-              <ThemedText style={styles.donateButtonText}>Schedule a Donation</ThemedText>
-            </TouchableOpacity>
+            <Ionicons name="shield-checkmark-outline" size={64} color="#CBD5E1" />
+            <ThemedText style={styles.emptyText}>No donations found</ThemedText>
+            <ThemedText style={styles.emptySubtext}>
+              {activeFilter === 'all' 
+                ? "You haven't booked any donations yet." 
+                : `You have no ${activeFilter} donations.`}
+            </ThemedText>
+            {activeFilter === 'all' && (
+              <TouchableOpacity style={styles.donateButton} onPress={() => router.push('/donate-blood')}>
+                <ThemedText style={styles.donateButtonText}>Find a Request</ThemedText>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           <View style={styles.listContainer}>
-            {donations.map((donation: any) => {
+            {filteredDonations.map((donation: any) => {
               const statusColors = getStatusColor(donation.status);
-              const institutionName = donation.institutions?.institution_name || 'Unknown center';
-              const address = donation.institutions?.address;
-              const phone = donation.institutions?.profiles?.phone_number;
-              const notes = donation.notes;
-              const dateStr = new Date(donation.scheduled_date).toLocaleDateString();
+              const institutionName = donation.institutions?.institution_name || 'Medical Center';
+              const dateNeeded = donation.blood_requests?.date_needed;
+              const timeNeeded = donation.blood_requests?.time_needed;
+              const requestedType = donation.blood_requests?.blood_type_needed;
+              
+              const dateStr = new Date(donation.scheduled_date).toLocaleDateString(undefined, {
+                month: 'short', day: 'numeric', year: 'numeric'
+              });
               const timeStr = new Date(donation.scheduled_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-              const isCanceling = cancelingId === donation.id;
               
               return (
                 <View key={donation.id} style={styles.historyCard}>
-                  <View style={styles.cardTopRow}>
-                    <View style={styles.cardHeaderLeft}>
-                      <MaterialIcons
-                        name={donation.status === 'completed' ? 'check-circle' : donation.status === 'scheduled' ? 'event' : 'cancel'}
-                        size={24}
-                        color={statusColors.text}
-                        style={styles.historyIcon}
-                      />
-                      <ThemedText style={styles.institutionName}>{institutionName}</ThemedText>
-                    </View>
+                  {/* Status & Date */}
+                  <View style={styles.cardHeader}>
                     <View style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}>
+                      <Ionicons name={statusColors.icon as any} size={14} color={statusColors.text} />
                       <ThemedText style={[styles.statusText, { color: statusColors.text }]}>
-                        {donation.status.charAt(0).toUpperCase() + donation.status.slice(1)}
+                        {donation.status.toUpperCase()}
                       </ThemedText>
                     </View>
+                    <ThemedText style={styles.dateText}>{dateStr}</ThemedText>
                   </View>
-                  
-                  <View style={styles.cardDetails}>
-                    <View style={styles.detailRow}>
-                      <MaterialIcons name="calendar-today" size={16} color="#7F8C8D" />
-                      <ThemedText style={styles.detailText}>{dateStr}</ThemedText>
+
+                  {/* Center Name */}
+                  <ThemedText style={styles.institutionName}>{institutionName}</ThemedText>
+
+                  {/* Request Context (if any) */}
+                  {requestedType && (
+                    <View style={styles.contextRow}>
+                      <Ionicons name="water" size={14} color="#DC2626" />
+                      <ThemedText style={styles.contextText}>Response to {requestedType} Request</ThemedText>
                     </View>
-                    <View style={styles.detailRow}>
-                      <MaterialIcons name="access-time" size={16} color="#7F8C8D" />
+                  )}
+
+                  <View style={styles.detailsGrid}>
+                    <View style={styles.detailItem}>
+                      <Ionicons name="time-outline" size={14} color="#64748B" />
                       <ThemedText style={styles.detailText}>{timeStr}</ThemedText>
                     </View>
-                    {address && (
-                      <View style={styles.detailRowFull}>
-                        <MaterialIcons name="location-on" size={16} color="#7F8C8D" />
-                        <ThemedText style={styles.detailText}>{address}</ThemedText>
-                      </View>
-                    )}
-                    {phone && (
-                      <View style={styles.detailRowFull}>
-                        <MaterialIcons name="phone" size={16} color="#7F8C8D" />
-                        <ThemedText style={styles.detailText}>{phone}</ThemedText>
-                      </View>
-                    )}
                     {donation.units_donated && (
-                      <View style={styles.detailRow}>
-                        <MaterialIcons name="water-drop" size={16} color="#E74C3C" />
-                        <ThemedText style={styles.detailText}>{donation.units_donated} units collected</ThemedText>
-                      </View>
-                    )}
-                    {notes && (
-                      <View style={styles.notesBox}>
-                        <ThemedText style={styles.notesLabel}>Notes from center:</ThemedText>
-                        <ThemedText style={styles.notesText}>{notes}</ThemedText>
+                      <View style={styles.detailItem}>
+                        <Ionicons name="flask-outline" size={14} color="#64748B" />
+                        <ThemedText style={styles.detailText}>{donation.units_donated} Unit{donation.units_donated > 1 ? 's' : ''}</ThemedText>
                       </View>
                     )}
                   </View>
 
-                  {donation.status === 'scheduled' && (
-                    <View style={styles.actionRow}>
-                      <TouchableOpacity 
-                        style={styles.cancelButton} 
-                        onPress={() => handleCancel(donation.id)}
-                        disabled={isCanceling}
-                      >
-                        {isCanceling ? (
-                          <ActivityIndicator size="small" color="#E74C3C" />
-                        ) : (
-                          <ThemedText style={styles.cancelButtonText}>Cancel Appointment</ThemedText>
-                        )}
-                      </TouchableOpacity>
+                  {/* Notes */}
+                  {donation.notes && (
+                    <View style={styles.notesSection}>
+                      <View style={styles.notesHeader}>
+                        <Ionicons name="chatbubble-ellipses-outline" size={12} color="#64748B" />
+                        <ThemedText style={styles.notesLabel}>Notes from Hospital</ThemedText>
+                      </View>
+                      <ThemedText style={styles.notesText}>{donation.notes}</ThemedText>
                     </View>
+                  )}
+
+                  {/* Cancel Action */}
+                  {donation.status === 'scheduled' && (
+                    <TouchableOpacity 
+                      style={styles.cancelBtn} 
+                      onPress={() => handleCancel(donation.id)}
+                      disabled={cancelingId === donation.id}
+                    >
+                      {cancelingId === donation.id ? (
+                        <ActivityIndicator size="small" color="#64748B" />
+                      ) : (
+                        <>
+                          <Ionicons name="close-circle-outline" size={16} color="#64748B" />
+                          <ThemedText style={styles.cancelBtnText}>Cancel Appointment</ThemedText>
+                        </>
+                      )}
+                    </TouchableOpacity>
                   )}
                 </View>
               );
@@ -181,27 +218,61 @@ export default function DonationsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F8F4F4',
+    backgroundColor: '#F8FAFC',
   },
   header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
     paddingVertical: 16,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E8E8E8',
+    borderBottomColor: '#F1F5F9',
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#2C3E50',
+    color: '#0F172A',
+  },
+  refreshBtn: {
+    padding: 8,
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
+  },
+  filterSection: {
+    backgroundColor: '#FFFFFF',
+    paddingBottom: 12,
+  },
+  filterContainer: {
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  filterTab: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  activeFilterTab: {
+    backgroundColor: '#FEE2E2',
+    borderColor: '#FCA5A5',
+  },
+  filterTabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  activeFilterTabText: {
+    color: '#DC2626',
   },
   container: {
     flex: 1,
   },
   contentContainer: {
-    padding: 16,
+    padding: 20,
     paddingBottom: 40,
     flexGrow: 1,
   },
@@ -211,30 +282,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 60,
   },
-  emptyIcon: {
-    marginBottom: 16,
-  },
   emptyText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#2C3E50',
+    fontWeight: 'bold',
+    color: '#1E293B',
+    marginTop: 16,
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#7F8C8D',
+    color: '#64748B',
     textAlign: 'center',
     marginBottom: 24,
+    maxWidth: '80%',
   },
   donateButton: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: '#DC2626',
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 12,
   },
   donateButtonText: {
     color: '#FFFFFF',
-    fontWeight: '600',
+    fontWeight: 'bold',
     fontSize: 16,
   },
   listContainer: {
@@ -242,101 +312,115 @@ const styles = StyleSheet.create({
   },
   historyCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 20,
     padding: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowRadius: 10,
+    elevation: 3,
   },
-  cardTopRow: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
   },
-  cardHeaderLeft: {
+  statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
-  },
-  historyIcon: {
-    marginRight: 8,
-  },
-  institutionName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2C3E50',
-    flex: 1,
-  },
-  statusBadge: {
+    gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
   },
   statusText: {
-    fontSize: 12,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  dateText: {
+    fontSize: 13,
     fontWeight: '600',
+    color: '#64748B',
   },
-  cardDetails: {
+  institutionName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 6,
+  },
+  contextRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 12,
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  contextText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#B91C1C',
+  },
+  detailsGrid: {
+    flexDirection: 'row',
     gap: 16,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    marginBottom: 16,
   },
-  detailRow: {
+  detailItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-  },
-  detailRowFull: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    width: '100%',
+    gap: 6,
   },
   detailText: {
-    fontSize: 13,
-    color: '#7F8C8D',
-    flexShrink: 1,
+    fontSize: 14,
+    color: '#475569',
+    fontWeight: '500',
   },
-  notesBox: {
-    width: '100%',
-    backgroundColor: '#F8F4F4',
-    padding: 10,
-    borderRadius: 8,
-    marginTop: 4,
+  notesSection: {
+    backgroundColor: '#F8FAFC',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#E2E8F0',
+  },
+  notesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
   },
   notesLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#2C3E50',
-    marginBottom: 2,
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#64748B',
+    textTransform: 'uppercase',
   },
   notesText: {
     fontSize: 13,
-    color: '#7F8C8D',
+    color: '#334155',
+    lineHeight: 18,
     fontStyle: 'italic',
   },
-  actionRow: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+  cancelBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    marginTop: 4,
   },
-  cancelButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: '#FDE8E8',
-  },
-  cancelButtonText: {
-    color: '#E74C3C',
-    fontWeight: '600',
-    fontSize: 14,
+  cancelBtnText: {
+    color: '#64748B',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });
