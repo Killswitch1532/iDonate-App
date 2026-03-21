@@ -30,24 +30,31 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     refreshUnreadCount();
 
     // Subscribe to new notifications
+    console.log(`[iDonate:Notifications] Subscribing to user-notifications-${user.id}`);
     const channel = supabase
       .channel(`user-notifications-${user.id}`)
       .on(
         'postgres_changes',
         {
-          event: '*', // Listen to inserts, updates (mark as read), and deletes
+          event: '*', 
           schema: 'public',
           table: 'notifications',
           filter: `user_id=eq.${user.id}`,
         },
-        () => {
-          // Whenever something changes, just refresh the count
+        (payload) => {
+          console.log('[iDonate:Notifications] Realtime change received:', payload.eventType);
           refreshUnreadCount();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`[iDonate:Notifications] Subscription status: ${status}`);
+        if (status === 'SUBSCRIBED') {
+          console.log('[iDonate:Notifications] Successfully connected to realtime notifications!');
+        }
+      });
 
     return () => {
+      console.log('[iDonate:Notifications] Unsubscribing from notifications');
       supabase.removeChannel(channel);
     };
   }, [user?.id]);

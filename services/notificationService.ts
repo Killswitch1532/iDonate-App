@@ -1,5 +1,5 @@
 import * as Device from 'expo-device';
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform, Alert } from 'react-native';
 import { supabase } from '@/lib/supabase';
 
@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
  * Check if we're running in Expo Go (push notifications are not supported)
  */
 function isExpoGo(): boolean {
-  return Constants.appOwnership === 'expo';
+  return Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 }
 
 /**
