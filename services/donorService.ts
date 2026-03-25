@@ -23,7 +23,7 @@ export async function getDonorProfile(userId: string) {
         .from('donors')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
     if (error) {
         console.error('[iDonate:DonorService] getDonorProfile failed', {
@@ -32,6 +32,29 @@ export async function getDonorProfile(userId: string) {
             message: error.message,
             details: error.details,
             hint: error.hint,
+        });
+    }
+
+    return { data, error };
+}
+
+/** Update the user's profile in the profiles table */
+export async function updateProfile(
+    userId: string,
+    updates: { full_name?: string; phone_number?: string }
+) {
+    console.log('[iDonate:DonorService] updateProfile', { userId, updates });
+
+    const { data, error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', userId)
+        .select()
+        .single();
+
+    if (error) {
+        console.error('[iDonate:DonorService] updateProfile failed', {
+            userId, code: error.code, message: error.message,
         });
     }
 

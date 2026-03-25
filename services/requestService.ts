@@ -9,6 +9,9 @@ export type BloodRequest = {
     urgency_level: 'critical' | 'high' | 'moderate' | 'low';
     status?: 'pending' | 'fulfilled' | 'cancelled';
     description?: string;
+    date_needed?: string;
+    time_needed?: string;
+    contact_phone?: string;
     created_at?: string;
     updated_at?: string;
 };

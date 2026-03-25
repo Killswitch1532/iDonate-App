@@ -3,6 +3,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import { registerForPushNotifications, savePushToken, clearPushToken } from '@/services/notificationService';
 
 type AuthContextType = {
     session: Session | null;
@@ -13,6 +14,7 @@ type AuthContextType = {
     signIn: (email: string, password: string) => Promise<{ error: any }>;
     signInWithGoogle: () => Promise<{ error: any }>;
     signOut: () => Promise<void>;
+    refreshProfile: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -38,6 +40,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(session?.user ?? null);
             if (session?.user) {
                 fetchProfile(session.user.id);
+                // Register for push notifications on app start if session exists
+                registerForPushNotifications().then(token => {
+                    if (token) savePushToken(session.user.id, token);
+                });
             }
             setLoading(false);
         });
@@ -61,6 +67,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                 .update({ avatar_url: avatarUrl })
                                 .eq('id', session.user.id);
                         }
+
+                        // Register for push notifications on sign-in
+                        registerForPushNotifications().then(token => {
+                            if (token) savePushToken(session.user.id, token);
+                        });
                     }
                 } else {
                     setProfile(null);
@@ -74,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async function fetchProfile(userId: string) {
         const { data, error } = await supabase
             .from('profiles')
-            .select('*')
+            .select('*, donors(blood_type, availability_status, last_donation_date)')
             .eq('id', userId)
             .maybeSingle();
 
@@ -88,8 +99,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             });
         }
         if (!error && data) {
-            console.log('[iDonate:Auth] Profile loaded', data);
-            setProfile(data);
+            // Flatten donor info into profile if it exists
+            const enrichedProfile = {
+                ...data,
+                blood_type: data.donors?.blood_type || null,
+                availability_status: data.donors?.availability_status || null,
+                last_donation_date: data.donors?.last_donation_date || null
+            };
+            console.log('[iDonate:Auth] Profile loaded', enrichedProfile);
+            setProfile(enrichedProfile);
         } else if (!error && !data) {
             console.warn('[iDonate:Auth] No profile found for user', userId);
         }
@@ -228,12 +246,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     async function signOut() {
+        if (user?.id) await clearPushToken(user.id);
         await supabase.auth.signOut();
+    }
+
+    async function refreshProfile() {
+        if (user?.id) await fetchProfile(user.id);
     }
 
     return (
         <AuthContext.Provider
-            value={{ session, user, profile, loading, signUp, signIn, signInWithGoogle, signOut }}
+            value={{ session, user, profile, loading, signUp, signIn, signInWithGoogle, signOut, refreshProfile }}
         >
             {children}
         </AuthContext.Provider>

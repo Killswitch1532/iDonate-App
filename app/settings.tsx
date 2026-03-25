@@ -93,7 +93,7 @@ export default function SettingsScreen() {
             title="Profile information"
             description="Name, blood type, contact"
             showChevron={true}
-            onPress={() => console.log('Profile information pressed')}
+            onPress={() => router.push('/edit-profile')}
           />
           <SettingItem
             icon="location-on"

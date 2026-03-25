@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { MaterialIcons } from '@expo/vector-icons';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -76,14 +77,14 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="notifications"
+        name="donations"
         options={{
-          title: 'Notifications',
+          title: 'Donations',
           tabBarIcon: ({ color, focused }) => (
-            <IconSymbol 
-              size={24} 
-              name={focused ? "bell.fill" : "bell"} 
-              color={color} 
+            <MaterialIcons
+              name="water-drop"
+              size={24}
+              color={color}
             />
           ),
         }}

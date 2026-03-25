@@ -12,6 +12,8 @@ import "react-native-reanimated";
 
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
+import { setupNotificationListeners } from "@/services/notificationService";
 
 export const unstable_settings = {
   anchor: "(tabs)",
@@ -20,7 +22,9 @@ export const unstable_settings = {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootLayoutNav />
+      <NotificationProvider>
+        <RootLayoutNav />
+      </NotificationProvider>
     </AuthProvider>
   );
 }
@@ -54,6 +58,21 @@ function RootLayoutNav() {
       router.replace('/onboarding');
     }
   }, [appIsReady, loading, user]);
+
+  // Handle notification taps → navigate to donate-blood (safe in Expo Go)
+  useEffect(() => {
+    let cleanup: (() => void) | undefined;
+    setupNotificationListeners((data) => {
+      if (data?.requestId) {
+        // Use object syntax to avoid type errors with dynamic routes
+        router.push({
+          pathname: '/blood-request/[id]',
+          params: { id: data.requestId }
+        } as any);
+      }
+    }).then(fn => { cleanup = fn; });
+    return () => cleanup?.();
+  }, []);
 
   if (!appIsReady || loading) {
     return (
