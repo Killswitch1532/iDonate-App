@@ -35,7 +35,7 @@ function getTimeAgo(dateStr: string): string {
 
 export default function HomeScreen() {
   const { user } = useAuth();
-  const { unreadCount } = useNotifications();
+  const { newCount } = useNotifications();
 
   const [bloodType, setBloodType] = useState<string | null>(null);
   const [nearbyCenters, setNearbyCenters] = useState<{ count: number; radiusKm: number } | null>(null);
@@ -43,6 +43,7 @@ export default function HomeScreen() {
   const [requests, setRequests] = useState<any[]>([]);
   const [donations, setDonations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
 
   useEffect(() => {
     let cancelled = false;
@@ -135,9 +136,9 @@ export default function HomeScreen() {
               onPress={() => router.push("/notifications")}
             >
               <MaterialIcons name="notifications-none" size={28} color="#2C3E50" />
-              {unreadCount > 0 && (
+              {newCount > 0 && (
                 <View style={styles.notificationBadge}>
-                  <ThemedText style={styles.badgeText}>{unreadCount}</ThemedText>
+                  <ThemedText style={styles.badgeText}>{newCount}</ThemedText>
                 </View>
               )}
             </TouchableOpacity>
@@ -265,8 +266,14 @@ export default function HomeScreen() {
                 critical: '#E74C3C', high: '#E67E22', moderate: '#F1C40F', low: '#27AE60',
               };
               const timeAgo = getTimeAgo(req.created_at);
+              const requesterName = req.institution_name || req.profiles?.full_name || 'Unknown';
               return (
-                <View key={req.id} style={styles.requestCard}>
+                <TouchableOpacity
+                  key={req.id}
+                  style={styles.requestCard}
+                  activeOpacity={0.7}
+                  onPress={() => router.push({ pathname: '/blood-request/[id]', params: { id: req.id } } as any)}
+                >
                   <View style={styles.requestRow}>
                     <View style={[styles.avatar, { backgroundColor: urgencyColors[req.urgency_level] || '#E74C3C' }]}>
                       <ThemedText style={{ color: '#FFF', fontWeight: 'bold', fontSize: 14 }}>
@@ -274,12 +281,21 @@ export default function HomeScreen() {
                       </ThemedText>
                     </View>
                     <View style={styles.requestContent}>
-                      <ThemedText style={styles.requestTitle}>
-                        {req.blood_type_needed} · {req.units_needed} unit{req.units_needed > 1 ? 's' : ''}
+                      <ThemedText style={styles.requestTitle} numberOfLines={1}>
+                        {requesterName}
                       </ThemedText>
                       <ThemedText style={styles.requestSubtitle}>
-                        {req.profiles?.full_name || 'Anonymous'} · {timeAgo}
+                        {req.blood_type_needed} · {req.units_needed} unit{req.units_needed > 1 ? 's' : ''} · {timeAgo}
                       </ThemedText>
+                      {req.description ? (
+                        <ThemedText style={{ fontSize: 12, color: '#95A5A6', marginTop: 2 }} numberOfLines={1}>
+                          {req.description}
+                        </ThemedText>
+                      ) : req.date_needed ? (
+                        <ThemedText style={{ fontSize: 12, color: '#95A5A6', marginTop: 2 }}>
+                          Needed by {new Date(req.date_needed).toLocaleDateString()}
+                        </ThemedText>
+                      ) : null}
                     </View>
                     <View style={[styles.matchingStatus, { backgroundColor: urgencyColors[req.urgency_level] + '20' }]}>
                       <ThemedText style={[styles.statusText, { color: urgencyColors[req.urgency_level] }]}>
@@ -287,7 +303,7 @@ export default function HomeScreen() {
                       </ThemedText>
                     </View>
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             })}
           </>

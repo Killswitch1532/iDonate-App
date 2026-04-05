@@ -29,7 +29,7 @@ export async function createBloodRequest(
     return { data, error };
 }
 
-/** Fetch all active (pending) blood requests */
+/** Fetch all active (pending) blood requests, enriched with institution names */
 export async function getActiveRequests() {
     const { data, error } = await supabase
         .from('blood_requests')
@@ -37,7 +37,28 @@ export async function getActiveRequests() {
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
-    return { data, error };
+    if (error || !data || data.length === 0) return { data, error };
+
+    // Batch-fetch institution names for all requester IDs
+    const requesterIds = [...new Set(data.map((r: any) => r.requester_id))];
+    const { data: institutions } = await supabase
+        .from('institutions')
+        .select('id, institution_name')
+        .in('id', requesterIds);
+
+    // Build a lookup map
+    const instMap: Record<string, string> = {};
+    (institutions || []).forEach((inst: any) => {
+        instMap[inst.id] = inst.institution_name;
+    });
+
+    // Merge institution_name into each request
+    const enriched = data.map((req: any) => ({
+        ...req,
+        institution_name: instMap[req.requester_id] || null,
+    }));
+
+    return { data: enriched, error: null };
 }
 
 /** Fetch requests created by a specific user */

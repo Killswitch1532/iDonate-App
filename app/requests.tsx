@@ -1,95 +1,88 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ScrollView, StyleSheet, TouchableOpacity, View, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import { getActiveRequests } from '@/services/requestService';
+
+function getTimeAgo(dateStr: string): string {
+  const now = Date.now();
+  const diff = now - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days === 1) return 'Yesterday';
+  return `${days}d ago`;
+}
 
 export default function RequestsScreen() {
   const [selectedFilter, setSelectedFilter] = useState<string>('All');
+  const [requests, setRequests] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const filters = ['All', 'Pending', 'Matched', 'Completed'];
+  const filters = ['All', 'Critical', 'High', 'Moderate', 'Low'];
 
-  const requests = [
-    {
-      id: 1,
-      status: 'pending',
-      bloodType: 'A+',
-      urgency: 'High',
-      location: 'City General Hospital',
-      distance: '2.4 km',
-      postedTime: '1 hour ago',
-      patientName: 'Sarah Johnson',
-      units: 2,
-    },
-    {
-      id: 2,
-      status: 'matched',
-      bloodType: 'O-',
-      urgency: 'Medium',
-      location: 'Regional Medical Center',
-      distance: '5.2 km',
-      postedTime: '3 hours ago',
-      patientName: 'Michael Chen',
-      units: 1,
-    },
-    {
-      id: 3,
-      status: 'completed',
-      bloodType: 'B+',
-      urgency: 'Low',
-      location: 'Community Hospital',
-      distance: '8.1 km',
-      postedTime: '1 day ago',
-      patientName: 'Emily Davis',
-      units: 3,
-    },
-    {
-      id: 4,
-      status: 'pending',
-      bloodType: 'AB-',
-      urgency: 'High',
-      location: 'Emergency Clinic',
-      distance: '1.8 km',
-      postedTime: '30 minutes ago',
-      patientName: 'Robert Wilson',
-      units: 1,
-    },
-  ];
-
-  const filteredRequests = selectedFilter === 'All' 
-    ? requests 
-    : requests.filter(request => request.status === selectedFilter.toLowerCase());
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return '#FFA500';
-      case 'matched': return '#4A90E2';
-      case 'completed': return '#27AE60';
-      default: return '#7F8C8D';
+  const loadRequests = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
+    try {
+      const { data, error } = await getActiveRequests();
+      if (error) throw error;
+      setRequests(data || []);
+    } catch (e) {
+      console.error('[iDonate:Requests] Load error', e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
+  }, []);
+
+  useEffect(() => {
+    loadRequests();
+  }, [loadRequests]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadRequests(false);
   };
+
+  const filteredRequests = selectedFilter === 'All'
+    ? requests
+    : requests.filter(r => r.urgency_level === selectedFilter.toLowerCase());
 
   const getUrgencyColor = (urgency: string) => {
     switch (urgency) {
-      case 'High': return '#E74C3C';
-      case 'Medium': return '#F39C12';
-      case 'Low': return '#27AE60';
+      case 'critical': return '#E74C3C';
+      case 'high': return '#E67E22';
+      case 'moderate': return '#F1C40F';
+      case 'low': return '#27AE60';
       default: return '#7F8C8D';
     }
   };
 
+  const criticalCount = requests.filter(r => r.urgency_level === 'critical' || r.urgency_level === 'high').length;
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#E74C3C']} />
+        }
+      >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <MaterialIcons name="arrow-back" size={24} color="#2C3E50" style={styles.backIcon} />
+            <MaterialIcons name="arrow-back" size={24} color="#2C3E50" />
           </TouchableOpacity>
           <View style={styles.headerContent}>
             <ThemedText style={styles.title}>Blood Requests</ThemedText>
@@ -99,8 +92,8 @@ export default function RequestsScreen() {
 
         {/* Filter Buttons */}
         <View style={styles.filtersSection}>
-          <ScrollView 
-            horizontal 
+          <ScrollView
+            horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.filtersContainer}
           >
@@ -128,87 +121,107 @@ export default function RequestsScreen() {
         <View style={styles.statsSection}>
           <View style={styles.statCard}>
             <ThemedText style={styles.statNumber}>{requests.length}</ThemedText>
-            <ThemedText style={styles.statLabel}>Total Requests</ThemedText>
+            <ThemedText style={styles.statLabel}>Active</ThemedText>
           </View>
           <View style={styles.statCard}>
-            <ThemedText style={styles.statNumber}>
-              {requests.filter(r => r.status === 'pending').length}
-            </ThemedText>
-            <ThemedText style={styles.statLabel}>Pending</ThemedText>
+            <ThemedText style={[styles.statNumber, { color: '#E74C3C' }]}>{criticalCount}</ThemedText>
+            <ThemedText style={styles.statLabel}>Urgent</ThemedText>
           </View>
           <View style={styles.statCard}>
-            <ThemedText style={styles.statNumber}>
-              {requests.filter(r => r.status === 'matched').length}
-            </ThemedText>
-            <ThemedText style={styles.statLabel}>Matched</ThemedText>
+            <ThemedText style={styles.statNumber}>{filteredRequests.length}</ThemedText>
+            <ThemedText style={styles.statLabel}>Showing</ThemedText>
           </View>
         </View>
 
         {/* Requests List */}
         <View style={styles.requestsSection}>
-          {filteredRequests.length === 0 ? (
+          {loading ? (
+            <ActivityIndicator size="large" color="#E74C3C" style={{ marginTop: 40 }} />
+          ) : filteredRequests.length === 0 ? (
             <View style={styles.emptyState}>
-              <MaterialIcons name="assignment" size={48} color="#7F8C8D" style={styles.emptyIcon} />
+              <MaterialIcons name="assignment" size={48} color="#BDC3C7" />
               <ThemedText style={styles.emptyTitle}>No requests found</ThemedText>
               <ThemedText style={styles.emptyDescription}>
-                No requests match your current filter.
+                {selectedFilter === 'All'
+                  ? 'No active blood requests right now. Pull to refresh.'
+                  : `No ${selectedFilter.toLowerCase()} urgency requests. Try another filter.`}
               </ThemedText>
             </View>
           ) : (
-            filteredRequests.map((request) => (
-              <TouchableOpacity 
-                key={request.id} 
-                style={styles.requestCard}
-              >
-                <View style={styles.requestHeader}>
-                  <View style={styles.requestInfo}>
-                    <ThemedText style={styles.patientName}>{request.patientName}</ThemedText>
-                    <View style={styles.requestMeta}>
-                      <ThemedText style={styles.bloodType}>{request.bloodType}</ThemedText>
-                      <ThemedText style={styles.separator}>•</ThemedText>
-                      <ThemedText style={styles.units}>{request.units} units</ThemedText>
+            filteredRequests.map((req: any) => {
+              const urgencyColor = getUrgencyColor(req.urgency_level);
+              const timeAgo = getTimeAgo(req.created_at);
+              const requesterName = req.institution_name || req.profiles?.full_name || 'Unknown';
+
+              return (
+                <TouchableOpacity
+                  key={req.id}
+                  style={styles.requestCard}
+                  activeOpacity={0.7}
+                  onPress={() => router.push({ pathname: '/blood-request/[id]', params: { id: req.id } } as any)}
+                >
+                  {/* Card Header */}
+                  <View style={styles.requestHeader}>
+                    <View style={styles.requestInfo}>
+                      <ThemedText style={styles.patientName} numberOfLines={1}>{requesterName}</ThemedText>
+                      <View style={styles.requestMeta}>
+                        <ThemedText style={styles.bloodType}>{req.blood_type_needed}</ThemedText>
+                        <ThemedText style={styles.separator}>•</ThemedText>
+                        <ThemedText style={styles.units}>{req.units_needed} unit{req.units_needed > 1 ? 's' : ''}</ThemedText>
+                        {req.patient_name && (
+                          <>
+                            <ThemedText style={styles.separator}>•</ThemedText>
+                            <ThemedText style={styles.units} numberOfLines={1}>{req.patient_name}</ThemedText>
+                          </>
+                        )}
+                      </View>
+                    </View>
+                    <View style={[styles.statusBadge, { backgroundColor: urgencyColor }]}>
+                      <ThemedText style={styles.statusText}>
+                        {req.urgency_level.charAt(0).toUpperCase() + req.urgency_level.slice(1)}
+                      </ThemedText>
                     </View>
                   </View>
-                  <View style={[
-                    styles.statusBadge,
-                    { backgroundColor: getStatusColor(request.status) }
-                  ]}>
-                    <ThemedText style={styles.statusText}>
-                      {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                    </ThemedText>
-                  </View>
-                </View>
 
-                <View style={styles.requestDetails}>
-                  <View style={styles.detailRow}>
-                    <MaterialIcons name="local-hospital" size={16} color="#7F8C8D" style={styles.detailIcon} />
-                    <ThemedText style={styles.detailText}>{request.location}</ThemedText>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <MaterialIcons name="location-on" size={16} color="#7F8C8D" style={styles.detailIcon} />
-                    <ThemedText style={styles.detailText}>{request.distance}</ThemedText>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <MaterialIcons name="access-time" size={16} color="#7F8C8D" style={styles.detailIcon} />
-                    <ThemedText style={styles.detailText}>{request.postedTime}</ThemedText>
-                  </View>
-                </View>
-
-                <View style={styles.requestFooter}>
-                  <View style={[
-                    styles.urgencyBadge,
-                    { backgroundColor: getUrgencyColor(request.urgency) }
-                  ]}>
-                    <ThemedText style={styles.urgencyText}>{request.urgency} Priority</ThemedText>
-                  </View>
-                  <TouchableOpacity style={styles.actionButton}>
-                    <ThemedText style={styles.actionButtonText}>
-                      {request.status === 'pending' ? 'Respond' : 'View Details'}
+                  {/* Description */}
+                  {req.description && (
+                    <ThemedText style={styles.descriptionText} numberOfLines={2}>
+                      {req.description}
                     </ThemedText>
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            ))
+                  )}
+
+                  {/* Details Row */}
+                  <View style={styles.requestDetails}>
+                    {req.date_needed && (
+                      <View style={styles.detailRow}>
+                        <MaterialIcons name="event" size={14} color="#7F8C8D" style={styles.detailIcon} />
+                        <ThemedText style={styles.detailText}>
+                          Needed by {new Date(req.date_needed).toLocaleDateString()}
+                          {req.time_needed ? ` at ${req.time_needed}` : ''}
+                        </ThemedText>
+                      </View>
+                    )}
+                    <View style={styles.detailRow}>
+                      <MaterialIcons name="access-time" size={14} color="#7F8C8D" style={styles.detailIcon} />
+                      <ThemedText style={styles.detailText}>Posted {timeAgo}</ThemedText>
+                    </View>
+                  </View>
+
+                  {/* Footer */}
+                  <View style={styles.requestFooter}>
+                    <View style={styles.footerLeft}>
+                      <View style={[styles.bloodTypeCircle, { borderColor: urgencyColor }]}>
+                        <ThemedText style={[styles.bloodTypeCircleText, { color: urgencyColor }]}>{req.blood_type_needed}</ThemedText>
+                      </View>
+                    </View>
+                    <View style={styles.actionButton}>
+                      <ThemedText style={styles.actionButtonText}>View Details</ThemedText>
+                      <MaterialIcons name="chevron-right" size={16} color="#FFFFFF" />
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })
           )}
         </View>
 
@@ -242,9 +255,6 @@ const styles = StyleSheet.create({
   backButton: {
     marginRight: 16,
   },
-  backIcon: {
-    // Icon styling handled by MaterialIcons component
-  },
   headerContent: {
     flex: 1,
   },
@@ -261,7 +271,7 @@ const styles = StyleSheet.create({
 
   // Filters Section
   filtersSection: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   filtersContainer: {
     paddingHorizontal: 4,
@@ -269,9 +279,9 @@ const styles = StyleSheet.create({
   filterButton: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    marginRight: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    marginRight: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -279,7 +289,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   selectedFilterButton: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: '#E74C3C',
   },
   filterText: {
     fontSize: 14,
@@ -294,13 +304,13 @@ const styles = StyleSheet.create({
   statsSection: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 24,
+    marginBottom: 20,
   },
   statCard: {
     flex: 1,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 16,
+    padding: 14,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -309,10 +319,10 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   statNumber: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#E74C3C',
-    marginBottom: 4,
+    color: '#2C3E50',
+    marginBottom: 2,
   },
   statLabel: {
     fontSize: 12,
@@ -326,23 +336,24 @@ const styles = StyleSheet.create({
   },
   requestCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 16,
-    marginBottom: 16,
+    marginBottom: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 3,
   },
   requestHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   requestInfo: {
     flex: 1,
+    marginRight: 12,
   },
   patientName: {
     fontSize: 16,
@@ -353,16 +364,17 @@ const styles = StyleSheet.create({
   requestMeta: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
   },
   bloodType: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#E74C3C',
   },
   separator: {
     fontSize: 14,
-    color: '#7F8C8D',
-    marginHorizontal: 8,
+    color: '#BDC3C7',
+    marginHorizontal: 6,
   },
   units: {
     fontSize: 14,
@@ -370,54 +382,80 @@ const styles = StyleSheet.create({
   },
   statusBadge: {
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
   statusText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
     color: '#FFFFFF',
+    textTransform: 'capitalize',
   },
+
+  // Description
+  descriptionText: {
+    fontSize: 13,
+    color: '#7F8C8D',
+    lineHeight: 18,
+    marginBottom: 10,
+    fontStyle: 'italic',
+  },
+
+  // Details
   requestDetails: {
-    marginBottom: 16,
+    marginBottom: 12,
+    gap: 4,
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
   },
   detailIcon: {
-    marginRight: 8,
-    width: 20,
+    marginRight: 6,
+    width: 18,
     textAlign: 'center',
   },
   detailText: {
-    fontSize: 14,
-    color: '#7F8C8D',
+    fontSize: 13,
+    color: '#95A5A6',
   },
+
+  // Footer
   requestFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+    paddingTop: 12,
   },
-  urgencyBadge: {
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  footerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  urgencyText: {
+  bloodTypeCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bloodTypeCircleText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontWeight: 'bold',
   },
   actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#4A90E2',
     borderRadius: 20,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 8,
+    gap: 4,
   },
   actionButtonText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#FFFFFF',
   },
@@ -425,15 +463,13 @@ const styles = StyleSheet.create({
   // Empty State
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyIcon: {
-    marginBottom: 16,
+    paddingVertical: 50,
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#2C3E50',
+    marginTop: 12,
     marginBottom: 8,
   },
   emptyDescription: {
@@ -441,6 +477,7 @@ const styles = StyleSheet.create({
     color: '#7F8C8D',
     textAlign: 'center',
     lineHeight: 20,
+    paddingHorizontal: 32,
   },
 
   // Bottom spacer

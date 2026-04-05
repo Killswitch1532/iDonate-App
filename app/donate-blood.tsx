@@ -497,29 +497,46 @@ export default function DonateBloodScreen() {
                       }
                       return true;
                     })
-                    .map((recipient) => (
-                      <View key={recipient.id} style={styles.recipientCard}>
-                        <View style={styles.recipientInfo}>
-                          <ThemedText style={styles.recipientName}>{(recipient as any).profiles?.full_name || 'Anonymous'}</ThemedText>
-                          <ThemedText style={styles.recipientDetails}>
-                            {recipient.blood_type_needed} • {recipient.units_needed} units • {recipient.patient_name || 'Patient'}
-                          </ThemedText>
-                          <ThemedText style={styles.recipientTime}>
-                            {recipient.created_at ? new Date(recipient.created_at).toLocaleDateString() : 'Recently'}
-                          </ThemedText>
-                        </View>
-                        <View style={styles.recipientUrgency}>
-                          <View style={[
-                            styles.urgencyTag,
-                            (recipient.urgency_level === 'critical' || recipient.urgency_level === 'high') ? styles.urgentTag : styles.normalTag
-                          ]}>
-                            <ThemedText style={styles.urgencyText}>
-                              {recipient.urgency_level.charAt(0).toUpperCase() + recipient.urgency_level.slice(1)}
+                    .map((recipient) => {
+                      const requesterName = (recipient as any).institution_name || (recipient as any).profiles?.full_name || 'Unknown';
+                      return (
+                        <TouchableOpacity
+                          key={recipient.id}
+                          style={styles.recipientCard}
+                          activeOpacity={0.7}
+                          onPress={() => router.push({ pathname: '/blood-request/[id]', params: { id: recipient.id! } } as any)}
+                        >
+                          <View style={styles.recipientInfo}>
+                            <ThemedText style={styles.recipientName} numberOfLines={1}>{requesterName}</ThemedText>
+                            <ThemedText style={styles.recipientDetails}>
+                              {recipient.blood_type_needed} • {recipient.units_needed} unit{recipient.units_needed > 1 ? 's' : ''}{recipient.patient_name ? ` • ${recipient.patient_name}` : ''}
+                            </ThemedText>
+                            {recipient.description && (
+                              <ThemedText style={{ fontSize: 12, color: '#95A5A6', marginTop: 2, fontStyle: 'italic' }} numberOfLines={1}>
+                                {recipient.description}
+                              </ThemedText>
+                            )}
+                            <ThemedText style={styles.recipientTime}>
+                              {recipient.date_needed
+                                ? `Needed by ${new Date(recipient.date_needed).toLocaleDateString()}`
+                                : recipient.created_at
+                                  ? `Posted ${new Date(recipient.created_at).toLocaleDateString()}`
+                                  : 'Recently'}
                             </ThemedText>
                           </View>
-                        </View>
-                      </View>
-                    ))
+                          <View style={styles.recipientUrgency}>
+                            <View style={[
+                              styles.urgencyTag,
+                              (recipient.urgency_level === 'critical' || recipient.urgency_level === 'high') ? styles.urgentTag : styles.normalTag
+                            ]}>
+                              <ThemedText style={styles.urgencyText}>
+                                {recipient.urgency_level.charAt(0).toUpperCase() + recipient.urgency_level.slice(1)}
+                              </ThemedText>
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })
                 )}
               </View>
             </View>

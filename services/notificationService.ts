@@ -172,6 +172,17 @@ export const getUnreadCount = async (userId: string) => {
   return { count: count || 0, error };
 };
 
+export const getUnreadCountSince = async (userId: string, since: string) => {
+  const { count, error } = await supabase
+    .from('notifications')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('is_read', false)
+    .gt('created_at', since);
+  
+  return { count: count || 0, error };
+};
+
 export const markAsRead = async (notificationId: string) => {
   return await supabase
     .from('notifications')

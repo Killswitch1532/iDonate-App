@@ -19,17 +19,25 @@ import {
   getNotifications, 
   markAsRead, 
   markAllAsRead, 
+  deleteNotification,
   clearAllNotifications, 
   Notification 
 } from "@/services/notificationService";
 
 export default function NotificationsScreen() {
   const { user } = useAuth();
-  const { unreadCount, refreshUnreadCount } = useNotifications();
+  const { unreadCount, refreshUnreadCount, resetBadgeCount } = useNotifications();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<string>("All");
+
+  // Reset the badge counter when leaving the notifications screen
+  useEffect(() => {
+    return () => {
+      resetBadgeCount();
+    };
+  }, [resetBadgeCount]);
 
   const filters = ["All", "Requests", "Reminders"];
 
@@ -60,14 +68,14 @@ export default function NotificationsScreen() {
   };
 
   const handleNotificationPress = async (notification: Notification) => {
-    if (!notification.is_read) {
-      await markAsRead(notification.id);
-      setNotifications(prev => 
-        prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n)
-      );
-      refreshUnreadCount();
-    }
+    // Remove from local list immediately
+    setNotifications(prev => prev.filter(n => n.id !== notification.id));
 
+    // Delete from database and refresh counts
+    await deleteNotification(notification.id);
+    refreshUnreadCount();
+
+    // Navigate to the relevant screen
     if (notification.data?.requestId) {
       router.push({
         pathname: '/blood-request/[id]',
@@ -246,7 +254,7 @@ export default function NotificationsScreen() {
             </TouchableOpacity>
             <TouchableOpacity style={styles.quickActionButton} onPress={handleClearAll}>
               <MaterialIcons name="delete-sweep" size={18} color="#E74C3C" />
-              <ThemedText style={styles.quickActionText}>Clear history</ThemedText>
+              <ThemedText style={styles.quickActionText}>Clear all notifications</ThemedText>
             </TouchableOpacity>
           </View>
         )}
