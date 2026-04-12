@@ -5,6 +5,20 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { registerForPushNotifications, savePushToken, clearPushToken } from '@/services/notificationService';
 
+// Try to load native Google Sign-In (requires dev build with native module)
+// Falls back to browser-based OAuth if not available
+let GoogleSignin: any = null;
+try {
+    const gsi = require('@react-native-google-signin/google-signin');
+    GoogleSignin = gsi.GoogleSignin;
+    GoogleSignin.configure({
+        webClientId: '655086831488-5kqeg9he2a1pfuni6q7ufh29ndvlmv2v.apps.googleusercontent.com',
+    });
+    console.log('[iDonate:Auth] Native Google Sign-In available');
+} catch {
+    console.log('[iDonate:Auth] Native Google Sign-In not available, using browser fallback');
+}
+
 type AuthContextType = {
     session: Session | null;
     user: User | null;
@@ -163,90 +177,100 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     async function signInWithGoogle() {
-        try {
-            console.log('[iDonate:Auth] Starting Google OAuth flow');
+        // ─── Strategy 1: Native Google Sign-In popup (dev build) ────
+        if (GoogleSignin) {
+            try {
+                console.log('[iDonate:Auth] Using native Google Sign-In');
+                await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
 
-            // Build the redirect URL using the app scheme
-            const redirectUrl = Linking.createURL('/');
-            console.log('[iDonate:Auth] Redirect URL:', redirectUrl);
+                // Sign out first so the account picker always shows
+                try { await GoogleSignin.signOut(); } catch {}
+
+                const signInResult = await GoogleSignin.signIn();
+                const idToken = signInResult?.data?.idToken;
+
+                if (!idToken) {
+                    console.error('[iDonate:Auth] No ID token from Google');
+                    return { error: { message: 'Google sign-in failed — no ID token received' } };
+                }
+
+                const { data, error } = await supabase.auth.signInWithIdToken({
+                    provider: 'google',
+                    token: idToken,
+                });
+
+                if (error) {
+                    console.error('[iDonate:Auth] signInWithIdToken error:', error.message);
+                    return { error };
+                }
+
+                console.log('[iDonate:Auth] Google Sign-In complete:', data?.user?.email);
+                return { error: null };
+            } catch (e: any) {
+                if (e?.code === 'SIGN_IN_CANCELLED' || e?.code === '12501') {
+                    return { error: null }; // User cancelled
+                }
+                console.error('[iDonate:Auth] Native Google Sign-In failed:', e?.message);
+                return { error: { message: e?.message || 'Google sign-in failed' } };
+            }
+        }
+
+        // ─── Strategy 2: Browser-based OAuth fallback (Expo Go) ─────
+        try {
+            console.log('[iDonate:Auth] Using browser-based Google OAuth');
+            const redirectUrl = 'idonateapp://google-auth';
 
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
-                options: {
-                    redirectTo: redirectUrl,
-                    skipBrowserRedirect: true,
-                },
+                options: { redirectTo: redirectUrl, skipBrowserRedirect: true },
             });
 
-            if (error) {
-                console.error('[iDonate:Auth] signInWithOAuth error', {
-                    code: error.code,
-                    message: error.message,
-                    fullError: JSON.stringify(error),
-                });
-                return { error };
-            }
+            if (error) return { error };
+            if (!data?.url) return { error: { message: 'No OAuth URL returned' } };
 
-            if (!data?.url) {
-                console.error('[iDonate:Auth] No OAuth URL returned');
-                return { error: { message: 'No OAuth URL returned from Supabase' } };
-            }
-
-            console.log('[iDonate:Auth] Opening browser for Google OAuth');
-
-            // Open the OAuth URL in the system browser
-            const result = await WebBrowser.openAuthSessionAsync(
-                data.url,
-                redirectUrl,
-            );
-
-            console.log('[iDonate:Auth] Browser result:', result.type);
+            const browserListenerUrl = Linking.createURL('google-auth');
+            const result = await WebBrowser.openAuthSessionAsync(data.url, browserListenerUrl);
 
             if (result.type === 'success' && result.url) {
-                // Extract the session from the redirect URL
-                const url = new URL(result.url);
+                const url = result.url;
+                let params: URLSearchParams;
+                const hashIndex = url.indexOf('#');
+                if (hashIndex !== -1) {
+                    params = new URLSearchParams(url.substring(hashIndex + 1));
+                } else {
+                    const queryIndex = url.indexOf('?');
+                    params = new URLSearchParams(queryIndex !== -1 ? url.substring(queryIndex + 1) : '');
+                }
 
-                // Supabase sends tokens in the hash fragment
-                const hashParams = new URLSearchParams(
-                    url.hash.replace('#', '')
-                );
-                const accessToken = hashParams.get('access_token');
-                const refreshToken = hashParams.get('refresh_token');
+                const accessToken = params.get('access_token');
+                const refreshToken = params.get('refresh_token');
 
                 if (accessToken && refreshToken) {
-                    console.log('[iDonate:Auth] Setting session from OAuth tokens');
                     const { error: sessionError } = await supabase.auth.setSession({
                         access_token: accessToken,
                         refresh_token: refreshToken,
                     });
-
-                    if (sessionError) {
-                        console.error('[iDonate:Auth] setSession error', {
-                            message: sessionError.message,
-                        });
-                        return { error: sessionError };
-                    }
+                    if (sessionError) return { error: sessionError };
                 } else {
-                    console.warn('[iDonate:Auth] No tokens found in redirect URL');
                     return { error: { message: 'Authentication failed — no tokens received' } };
                 }
             } else if (result.type === 'cancel' || result.type === 'dismiss') {
-                console.log('[iDonate:Auth] Google OAuth cancelled by user');
-                return { error: null }; // User cancelled, not an error
+                return { error: null }; // User cancelled
             }
 
             return { error: null };
         } catch (e: any) {
-            console.error('[iDonate:Auth] Google OAuth exception', {
-                message: e?.message,
-                stack: e?.stack,
-            });
+            console.error('[iDonate:Auth] Browser Google OAuth failed:', e?.message);
             return { error: { message: e?.message || 'Google sign-in failed' } };
         }
     }
 
     async function signOut() {
         if (user?.id) await clearPushToken(user.id);
+        // Also sign out from Google if native module is available
+        if (GoogleSignin) {
+            try { await GoogleSignin.signOut(); } catch {}
+        }
         await supabase.auth.signOut();
     }
 
