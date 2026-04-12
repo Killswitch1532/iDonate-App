@@ -1,7 +1,7 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Location from "expo-location";
-import React, { useEffect, useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
 
 import { ThemedText } from "@/components/themed-text";
 import Button from "@/components/ui/Button";
@@ -19,7 +20,16 @@ import { useNotifications } from "@/contexts/NotificationContext";
 import { getDonorProfile } from "@/services/donorService";
 import { getNearbyInstitutionCount, getNearbyInstitutions } from "@/services/institutionService";
 import { getActiveRequests } from "@/services/requestService";
-import { getDonorDonations } from "@/services/donationService";
+import { getDonorDonations, getDonorRequestStatuses, DonationStatus } from "@/services/donationService";
+
+// Status config for visual indicators on home cards
+const STATUS_CONFIG: Record<DonationStatus, { label: string; color: string; bg: string; borderColor: string; cardBg: string }> = {
+  scheduled: { label: 'Scheduled', color: '#2563EB', bg: '#DBEAFE', borderColor: '#93C5FD', cardBg: '#EFF6FF' },
+  confirmed: { label: 'Confirmed', color: '#D97706', bg: '#FEF3C7', borderColor: '#FDE68A', cardBg: '#FFFBEB' },
+  completed: { label: 'Donated', color: '#16A34A', bg: '#DCFCE7', borderColor: '#BBF7D0', cardBg: '#F0FDF4' },
+  cancelled: { label: 'Cancelled', color: '#64748B', bg: '#F1F5F9', borderColor: '#E2E8F0', cardBg: '#F8FAFC' },
+  no_show: { label: 'No Show', color: '#64748B', bg: '#F1F5F9', borderColor: '#E2E8F0', cardBg: '#F8FAFC' },
+};
 
 function getTimeAgo(dateStr: string): string {
   const now = Date.now();
@@ -42,74 +52,83 @@ export default function HomeScreen() {
   const [nearbyInstitutions, setNearbyInstitutions] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [donations, setDonations] = useState<any[]>([]);
+  const [requestStatuses, setRequestStatuses] = useState<Map<string, DonationStatus>>(new Map());
   const [loading, setLoading] = useState(true);
 
 
-  useEffect(() => {
-    let cancelled = false;
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
 
-    async function fetchData() {
-      setLoading(true);
+      async function fetchData() {
+        setLoading(true);
 
-      // Fetch blood type
-      const bloodTypePromise = (async () => {
-        if (!user?.id) return;
-        const { data } = await getDonorProfile(user.id);
-        if (!cancelled && data?.blood_type) {
-          setBloodType(data.blood_type);
-        }
-      })();
-
-      // Fetch active requests
-      const requestsPromise = (async () => {
-        try {
-          const { data } = await getActiveRequests();
-          if (!cancelled && data) setRequests(data.slice(0, 5));
-        } catch (e) {
-          console.error('[iDonate:Home] Requests error', e);
-        }
-      })();
-
-      // Fetch user's donations
-      const donationsPromise = (async () => {
-        if (!user?.id) return;
-        try {
-          const { data } = await getDonorDonations(user.id);
-          if (!cancelled && data) {
-            const upcoming = data.filter((d: any) => d.status === 'scheduled' || d.status === 'confirmed');
-            setDonations(upcoming.slice(0, 3));
+        // Fetch blood type
+        const bloodTypePromise = (async () => {
+          if (!user?.id) return;
+          const { data } = await getDonorProfile(user.id);
+          if (!cancelled && data?.blood_type) {
+            setBloodType(data.blood_type);
           }
-        } catch (e) {
-          console.error('[iDonate:Home] Donations error', e);
-        }
-      })();
+        })();
 
-      // Fetch nearby centers
-      const nearbyPromise = (async () => {
-        try {
-          const { status } = await Location.requestForegroundPermissionsAsync();
-          if (status !== "granted") return;
-          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-          const [countResult, listResult] = await Promise.all([
-            getNearbyInstitutionCount(loc.coords.latitude, loc.coords.longitude),
-            getNearbyInstitutions(loc.coords.latitude, loc.coords.longitude, 10),
-          ]);
-          if (!cancelled) {
-            if (!countResult.error) setNearbyCenters({ count: countResult.count, radiusKm: countResult.radiusKm });
-            if (listResult.data) setNearbyInstitutions(listResult.data.slice(0, 5));
+        // Fetch active requests
+        const requestsPromise = (async () => {
+          try {
+            const { data } = await getActiveRequests();
+            if (!cancelled && data) setRequests(data.slice(0, 5));
+          } catch (e) {
+            console.error('[iDonate:Home] Requests error', e);
           }
-        } catch (e) {
-          console.error('[iDonate:Home] Nearby centers error', e);
-        }
-      })();
+        })();
 
-      await Promise.all([bloodTypePromise, requestsPromise, donationsPromise, nearbyPromise]);
-      if (!cancelled) setLoading(false);
-    }
+        // Fetch user's donations + request statuses
+        const donationsPromise = (async () => {
+          if (!user?.id) return;
+          try {
+            const [donationsResult, statusesResult] = await Promise.all([
+              getDonorDonations(user.id),
+              getDonorRequestStatuses(user.id),
+            ]);
+            if (!cancelled && donationsResult.data) {
+              const upcoming = donationsResult.data.filter((d: any) => d.status === 'scheduled' || d.status === 'confirmed');
+              setDonations(upcoming.slice(0, 3));
+            }
+            if (!cancelled) {
+              setRequestStatuses(statusesResult.statuses);
+            }
+          } catch (e) {
+            console.error('[iDonate:Home] Donations error', e);
+          }
+        })();
 
-    fetchData();
-    return () => { cancelled = true; };
-  }, [user?.id]);
+        // Fetch nearby centers
+        const nearbyPromise = (async () => {
+          try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== "granted") return;
+            const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            const [countResult, listResult] = await Promise.all([
+              getNearbyInstitutionCount(loc.coords.latitude, loc.coords.longitude),
+              getNearbyInstitutions(loc.coords.latitude, loc.coords.longitude, 10),
+            ]);
+            if (!cancelled) {
+              if (!countResult.error) setNearbyCenters({ count: countResult.count, radiusKm: countResult.radiusKm });
+              if (listResult.data) setNearbyInstitutions(listResult.data.slice(0, 5));
+            }
+          } catch (e) {
+            console.error('[iDonate:Home] Nearby centers error', e);
+          }
+        })();
+
+        await Promise.all([bloodTypePromise, requestsPromise, donationsPromise, nearbyPromise]);
+        if (!cancelled) setLoading(false);
+      }
+
+      fetchData();
+      return () => { cancelled = true; };
+    }, [user?.id])
+  );
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -251,9 +270,12 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {loading ? (
+        {(() => {
+          const HIDDEN_STATUSES = new Set(['completed', 'cancelled', 'no_show']);
+          const visibleRequests = requests.filter(r => !HIDDEN_STATUSES.has(requestStatuses.get(r.id) as string));
+          return loading ? (
           <ActivityIndicator size="small" color="#E74C3C" style={{ marginBottom: 16 }} />
-        ) : requests.length === 0 ? (
+        ) : visibleRequests.length === 0 ? (
           <View style={styles.requestCard}>
             <ThemedText style={{ color: '#7F8C8D', textAlign: 'center', padding: 8 }}>
               No active requests right now
@@ -261,29 +283,44 @@ export default function HomeScreen() {
           </View>
         ) : (
           <>
-            {requests.map((req: any) => {
+            {visibleRequests.map((req: any) => {
               const urgencyColors: Record<string, string> = {
                 critical: '#E74C3C', high: '#E67E22', moderate: '#F1C40F', low: '#27AE60',
               };
               const timeAgo = getTimeAgo(req.created_at);
               const requesterName = req.institution_name || req.profiles?.full_name || 'Unknown';
+              const donationStatus = requestStatuses.get(req.id);
+              const statusCfg = donationStatus ? STATUS_CONFIG[donationStatus] : null;
               return (
                 <TouchableOpacity
                   key={req.id}
-                  style={styles.requestCard}
+                  style={[styles.requestCard, statusCfg && { backgroundColor: statusCfg.cardBg, borderWidth: 1.5, borderColor: statusCfg.borderColor }]}
                   activeOpacity={0.7}
                   onPress={() => router.push({ pathname: '/blood-request/[id]', params: { id: req.id } } as any)}
                 >
                   <View style={styles.requestRow}>
-                    <View style={[styles.avatar, { backgroundColor: urgencyColors[req.urgency_level] || '#E74C3C' }]}>
-                      <ThemedText style={{ color: '#FFF', fontWeight: 'bold', fontSize: 14 }}>
-                        {req.blood_type_needed}
-                      </ThemedText>
+                    <View style={[styles.avatar, { backgroundColor: statusCfg ? statusCfg.color : (urgencyColors[req.urgency_level] || '#E74C3C') }]}>
+                      {donationStatus === 'completed' ? (
+                        <MaterialIcons name="check" size={20} color="#FFF" />
+                      ) : donationStatus === 'cancelled' ? (
+                        <MaterialIcons name="close" size={20} color="#FFF" />
+                      ) : (
+                        <ThemedText style={{ color: '#FFF', fontWeight: 'bold', fontSize: 14 }}>
+                          {req.blood_type_needed}
+                        </ThemedText>
+                      )}
                     </View>
                     <View style={styles.requestContent}>
-                      <ThemedText style={styles.requestTitle} numberOfLines={1}>
-                        {requesterName}
-                      </ThemedText>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <ThemedText style={styles.requestTitle} numberOfLines={1}>
+                          {requesterName}
+                        </ThemedText>
+                        {statusCfg && (
+                          <View style={[styles.statusMiniTag, { backgroundColor: statusCfg.bg }]}>
+                            <ThemedText style={[styles.statusMiniTagText, { color: statusCfg.color }]}>{statusCfg.label}</ThemedText>
+                          </View>
+                        )}
+                      </View>
                       <ThemedText style={styles.requestSubtitle}>
                         {req.blood_type_needed} · {req.units_needed} unit{req.units_needed > 1 ? 's' : ''} · {timeAgo}
                       </ThemedText>
@@ -297,9 +334,9 @@ export default function HomeScreen() {
                         </ThemedText>
                       ) : null}
                     </View>
-                    <View style={[styles.matchingStatus, { backgroundColor: urgencyColors[req.urgency_level] + '20' }]}>
-                      <ThemedText style={[styles.statusText, { color: urgencyColors[req.urgency_level] }]}>
-                        {req.urgency_level}
+                    <View style={[styles.matchingStatus, { backgroundColor: statusCfg ? statusCfg.bg : urgencyColors[req.urgency_level] + '20' }]}>
+                      <ThemedText style={[styles.statusText, { color: statusCfg ? statusCfg.color : urgencyColors[req.urgency_level] }]}>
+                        {statusCfg ? statusCfg.label.toLowerCase() : req.urgency_level}
                       </ThemedText>
                     </View>
                   </View>
@@ -307,7 +344,8 @@ export default function HomeScreen() {
               );
             })}
           </>
-        )}
+        );
+        })()}
 
         {/* Nearby Donation Centers */}
         <View style={styles.mapSection}>
@@ -819,5 +857,16 @@ const styles = StyleSheet.create({
   // Bottom spacer
   bottomSpacer: {
     height: 20,
+  },
+
+  // Donation status indicators
+  statusMiniTag: {
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  statusMiniTagText: {
+    fontSize: 10,
+    fontWeight: "700",
   },
 });

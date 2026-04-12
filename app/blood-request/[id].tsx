@@ -3,8 +3,37 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { bookDonation } from '@/services/donationService';
+import { bookDonation, getActiveDonation, getDonationForRequest, DonationStatus } from '@/services/donationService';
 import { Ionicons } from '@expo/vector-icons';
+
+// Visual config per donation status
+const DETAIL_STATUS_CONFIG: Record<DonationStatus, { icon: string; title: string; subtitle: string; iconColor: string; bannerBg: string; bannerBorder: string; titleColor: string; subtitleColor: string; buttonBg: string; buttonBorder: string; buttonTextColor: string; buttonLabel: string }> = {
+  scheduled: {
+    icon: 'time-outline', title: 'Donation Scheduled', subtitle: 'The hospital will contact you soon. View your donations for details.',
+    iconColor: '#2563EB', bannerBg: '#DBEAFE', bannerBorder: '#93C5FD', titleColor: '#1E40AF', subtitleColor: '#2563EB',
+    buttonBg: '#DBEAFE', buttonBorder: '#93C5FD', buttonTextColor: '#1E40AF', buttonLabel: 'Scheduled',
+  },
+  confirmed: {
+    icon: 'checkmark-done-outline', title: 'Donation Confirmed', subtitle: 'Your donation is confirmed by the hospital. Please arrive on time.',
+    iconColor: '#D97706', bannerBg: '#FEF3C7', bannerBorder: '#FDE68A', titleColor: '#92400E', subtitleColor: '#A16207',
+    buttonBg: '#FEF3C7', buttonBorder: '#FDE68A', buttonTextColor: '#92400E', buttonLabel: 'Confirmed',
+  },
+  completed: {
+    icon: 'ribbon-outline', title: 'Donation Completed', subtitle: 'Thank you for donating! You helped save a life.',
+    iconColor: '#16A34A', bannerBg: '#DCFCE7', bannerBorder: '#BBF7D0', titleColor: '#166534', subtitleColor: '#15803D',
+    buttonBg: '#DCFCE7', buttonBorder: '#BBF7D0', buttonTextColor: '#166534', buttonLabel: 'Donated ✓',
+  },
+  cancelled: {
+    icon: 'close-circle-outline', title: 'Donation Cancelled', subtitle: 'This donation was cancelled. You can accept this request again if needed.',
+    iconColor: '#64748B', bannerBg: '#F1F5F9', bannerBorder: '#E2E8F0', titleColor: '#334155', subtitleColor: '#64748B',
+    buttonBg: '#F1F5F9', buttonBorder: '#E2E8F0', buttonTextColor: '#64748B', buttonLabel: 'Cancelled',
+  },
+  no_show: {
+    icon: 'help-circle-outline', title: 'Marked as No Show', subtitle: 'You were marked as a no-show for this donation.',
+    iconColor: '#64748B', bannerBg: '#F1F5F9', bannerBorder: '#E2E8F0', titleColor: '#334155', subtitleColor: '#64748B',
+    buttonBg: '#F1F5F9', buttonBorder: '#E2E8F0', buttonTextColor: '#64748B', buttonLabel: 'No Show',
+  },
+};
 
 // Medical Compatibility Map (Who can donate to whom)
 const COMPATIBILITY_MAP: Record<string, string[]> = {
@@ -27,6 +56,11 @@ export default function BloodRequestDetails() {
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
 
+  // Donation state for THIS request
+  const [thisRequestStatus, setThisRequestStatus] = useState<DonationStatus | null>(null);
+  const [activeDonation, setActiveDonation] = useState<any>(null); // active donation for another request
+  const [acceptanceLoading, setAcceptanceLoading] = useState(true);
+
   useEffect(() => {
     fetchData();
   }, [id]);
@@ -34,6 +68,8 @@ export default function BloodRequestDetails() {
   async function fetchData() {
     try {
       setLoading(true);
+      setAcceptanceLoading(true);
+
       // Fetch request details
       const { data: requestData, error: requestError } = await supabase
         .from('blood_requests')
@@ -54,12 +90,27 @@ export default function BloodRequestDetails() {
       if (instError) throw instError;
       setInstitution(instData);
 
+      // Check if user already has a donation for this request or another active
+      if (user?.id && requestData?.id) {
+        const [thisReq, activeReq] = await Promise.all([
+          getDonationForRequest(user.id, requestData.id),
+          getActiveDonation(user.id),
+        ]);
+
+        if (thisReq.data) {
+          setThisRequestStatus(thisReq.data.status as DonationStatus);
+        } else if (activeReq.data && activeReq.data.blood_request_id !== requestData.id) {
+          setActiveDonation(activeReq.data);
+        }
+      }
+
     } catch (error: any) {
       console.error('[iDonate:RequestDetails] Error fetching data:', error.message);
       Alert.alert('Error', 'Could not load request details.');
       router.back();
     } finally {
       setLoading(false);
+      setAcceptanceLoading(false);
     }
   }
 
@@ -68,7 +119,7 @@ export default function BloodRequestDetails() {
 
     Alert.alert(
       'Confirm Donation',
-      `Are you sure you want to volunteer for this ${request.blood_type_needed} blood request?`,
+      `Are you sure you want to volunteer for this ${request.blood_type_needed} blood request?\n\nYou will not be able to accept other requests until this one is completed or cancelled.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -100,6 +151,8 @@ export default function BloodRequestDetails() {
               });
 
               if (error) throw error;
+
+              setThisRequestStatus('scheduled');
 
               Alert.alert(
                 'Success!',
@@ -134,6 +187,13 @@ export default function BloodRequestDetails() {
     return `Your blood type (${profile.blood_type}) is compatible with ${request.blood_type_needed} patients.`;
   };
 
+  // For cancelled/no_show, user can re-accept
+  const hasActiveCommitment = thisRequestStatus === 'scheduled' || thisRequestStatus === 'confirmed';
+  const isTerminalState = thisRequestStatus === 'completed';
+  const canReAccept = thisRequestStatus === 'cancelled' || thisRequestStatus === 'no_show';
+  // Can accept if: compatible, no current commitment to THIS request (or can re-accept), no active donation elsewhere
+  const canAccept = isCompatible() && !hasActiveCommitment && !isTerminalState && !activeDonation && !acceptanceLoading;
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -156,6 +216,53 @@ export default function BloodRequestDetails() {
         <Text style={styles.bloodType}>{request.blood_type_needed}</Text>
         <Text style={styles.units}>{request.units_needed} Unit{request.units_needed > 1 ? 's' : ''} Needed</Text>
       </View>
+
+      {/* Donation status banner */}
+      {thisRequestStatus && DETAIL_STATUS_CONFIG[thisRequestStatus] && (
+        <View style={[styles.statusBanner, { backgroundColor: DETAIL_STATUS_CONFIG[thisRequestStatus].bannerBg, borderColor: DETAIL_STATUS_CONFIG[thisRequestStatus].bannerBorder }]}>
+          <Ionicons name={DETAIL_STATUS_CONFIG[thisRequestStatus].icon as any} size={24} color={DETAIL_STATUS_CONFIG[thisRequestStatus].iconColor} />
+          <View style={styles.bannerContent}>
+            <Text style={[styles.bannerTitle, { color: DETAIL_STATUS_CONFIG[thisRequestStatus].titleColor }]}>
+              {DETAIL_STATUS_CONFIG[thisRequestStatus].title}
+            </Text>
+            <Text style={[styles.bannerSubtitle, { color: DETAIL_STATUS_CONFIG[thisRequestStatus].subtitleColor }]}>
+              {DETAIL_STATUS_CONFIG[thisRequestStatus].subtitle}
+            </Text>
+            {(hasActiveCommitment || isTerminalState) && (
+              <TouchableOpacity
+                style={styles.viewDonationsLink}
+                onPress={() => router.push('/(tabs)/donations')}
+              >
+                <Text style={styles.viewDonationsLinkText}>View My Donations</Text>
+                <Ionicons name="arrow-forward" size={14} color="#2563EB" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* Already has an active donation for another request */}
+      {!thisRequestStatus && activeDonation && (
+        <View style={styles.blockedBanner}>
+          <Ionicons name="information-circle" size={24} color="#D97706" />
+          <View style={styles.acceptedBannerContent}>
+            <Text style={styles.blockedBannerTitle}>You already have an active donation</Text>
+            <Text style={styles.blockedBannerSubtitle}>
+              You accepted a {activeDonation.blood_requests?.blood_type_needed || ''} request
+              {activeDonation.institutions?.institution_name
+                ? ` at ${activeDonation.institutions.institution_name}`
+                : ''}. Complete or cancel it before accepting another.
+            </Text>
+            <TouchableOpacity
+              style={styles.viewDonationsLink}
+              onPress={() => router.push('/(tabs)/donations')}
+            >
+              <Text style={styles.viewDonationsLinkText}>View My Donations</Text>
+              <Ionicons name="arrow-forward" size={14} color="#2563EB" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* Schedule Card */}
       {(request.date_needed || request.time_needed) && (
@@ -231,20 +338,37 @@ export default function BloodRequestDetails() {
 
       {/* Actions */}
       <View style={styles.actions}>
-        <TouchableOpacity 
-          style={[styles.acceptButton, !isCompatible() && styles.disabledButton]} 
-          onPress={handleAccept}
-          disabled={booking || !isCompatible()}
-        >
-          {booking ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.acceptButtonText}>I want to Donate</Text>
-          )}
-        </TouchableOpacity>
+        {hasActiveCommitment || isTerminalState ? (
+          // Show status state button
+          <View style={[styles.stateButton, { backgroundColor: DETAIL_STATUS_CONFIG[thisRequestStatus!].buttonBg, borderColor: DETAIL_STATUS_CONFIG[thisRequestStatus!].buttonBorder }]}>
+            <Ionicons name={DETAIL_STATUS_CONFIG[thisRequestStatus!].icon as any} size={20} color={DETAIL_STATUS_CONFIG[thisRequestStatus!].buttonTextColor} />
+            <Text style={[styles.stateButtonText, { color: DETAIL_STATUS_CONFIG[thisRequestStatus!].buttonTextColor }]}>
+              {DETAIL_STATUS_CONFIG[thisRequestStatus!].buttonLabel}
+            </Text>
+          </View>
+        ) : (
+          // Normal donate button (disabled if incompatible or has another active donation)
+          <TouchableOpacity 
+            style={[styles.acceptButton, (!canAccept) && styles.disabledButton]} 
+            onPress={handleAccept}
+            disabled={booking || !canAccept}
+          >
+            {booking ? (
+              <ActivityIndicator color="#fff" />
+            ) : acceptanceLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.acceptButtonText}>
+                {activeDonation ? 'Already Committed' : canReAccept ? 'Accept Again' : 'I want to Donate'}
+              </Text>
+            )}
+          </TouchableOpacity>
+        )}
         
         <TouchableOpacity style={styles.rejectButton} onPress={() => router.back()}>
-          <Text style={styles.rejectButtonText}>Dismiss</Text>
+          <Text style={styles.rejectButtonText}>
+            {hasActiveCommitment || isTerminalState ? 'Go Back' : 'Dismiss'}
+          </Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -299,6 +423,68 @@ const styles = StyleSheet.create({
     color: '#64748B',
     fontWeight: '600',
   },
+
+  // Generic status banner (replaces acceptedBanner)
+  statusBanner: {
+    flexDirection: 'row',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 16,
+    alignItems: 'flex-start',
+    gap: 12,
+    borderWidth: 1,
+  },
+  bannerContent: {
+    flex: 1,
+  },
+  bannerTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  bannerSubtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+
+  // Blocked banner (already has active donation)
+  blockedBanner: {
+    flexDirection: 'row',
+    backgroundColor: '#FEF3C7',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 16,
+    alignItems: 'flex-start',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  acceptedBannerContent: {
+    flex: 1,
+  },
+  blockedBannerTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#92400E',
+    marginBottom: 4,
+  },
+  blockedBannerSubtitle: {
+    fontSize: 14,
+    color: '#A16207',
+    lineHeight: 20,
+  },
+  viewDonationsLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 8,
+  },
+  viewDonationsLinkText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#2563EB',
+  },
+
   card: {
     backgroundColor: '#fff',
     padding: 16,
@@ -393,6 +579,20 @@ const styles = StyleSheet.create({
   },
   acceptButtonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  stateButton: {
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+  },
+  stateButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
   },

@@ -1,11 +1,23 @@
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 
 import { ThemedText } from '@/components/themed-text';
+import { useAuth } from '@/contexts/AuthContext';
 import { getActiveRequests } from '@/services/requestService';
+import { getDonorRequestStatuses, DonationStatus } from '@/services/donationService';
+
+// Status config for visual indicators
+const STATUS_CONFIG: Record<DonationStatus, { label: string; icon: string; color: string; bg: string; borderColor: string; cardBg: string }> = {
+  scheduled: { label: 'Scheduled', icon: 'time-outline', color: '#2563EB', bg: '#DBEAFE', borderColor: '#93C5FD', cardBg: '#EFF6FF' },
+  confirmed: { label: 'Confirmed', icon: 'checkmark-done-outline', color: '#D97706', bg: '#FEF3C7', borderColor: '#FDE68A', cardBg: '#FFFBEB' },
+  completed: { label: 'Donated', icon: 'ribbon-outline', color: '#16A34A', bg: '#DCFCE7', borderColor: '#BBF7D0', cardBg: '#F0FDF4' },
+  cancelled: { label: 'Cancelled', icon: 'close-circle-outline', color: '#64748B', bg: '#F1F5F9', borderColor: '#E2E8F0', cardBg: '#F8FAFC' },
+  no_show: { label: 'No Show', icon: 'help-circle-outline', color: '#64748B', bg: '#F1F5F9', borderColor: '#E2E8F0', cardBg: '#F8FAFC' },
+};
 
 function getTimeAgo(dateStr: string): string {
   const now = Date.now();
@@ -21,39 +33,53 @@ function getTimeAgo(dateStr: string): string {
 }
 
 export default function RequestsScreen() {
+  const { user } = useAuth();
   const [selectedFilter, setSelectedFilter] = useState<string>('All');
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [requestStatuses, setRequestStatuses] = useState<Map<string, DonationStatus>>(new Map());
 
   const filters = ['All', 'Critical', 'High', 'Moderate', 'Low'];
 
   const loadRequests = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
-      const { data, error } = await getActiveRequests();
-      if (error) throw error;
-      setRequests(data || []);
+      const [requestsResult, statusesResult] = await Promise.all([
+        getActiveRequests(),
+        user?.id ? getDonorRequestStatuses(user.id) : Promise.resolve({ statuses: new Map<string, DonationStatus>(), error: null }),
+      ]);
+
+      if (requestsResult.error) throw requestsResult.error;
+      setRequests(requestsResult.data || []);
+      setRequestStatuses(statusesResult.statuses);
     } catch (e) {
       console.error('[iDonate:Requests] Load error', e);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [user?.id]);
 
-  useEffect(() => {
-    loadRequests();
-  }, [loadRequests]);
+  // Re-fetch every time the screen gains focus (e.g. after accepting a request)
+  useFocusEffect(
+    useCallback(() => {
+      loadRequests();
+    }, [loadRequests])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
     loadRequests(false);
   };
 
+  // Hide requests where the user has a terminal donation (completed, cancelled, no_show)
+  const HIDDEN_STATUSES = new Set(['completed', 'cancelled', 'no_show']);
+  const visibleRequests = requests.filter(r => !HIDDEN_STATUSES.has(requestStatuses.get(r.id) as string));
+
   const filteredRequests = selectedFilter === 'All'
-    ? requests
-    : requests.filter(r => r.urgency_level === selectedFilter.toLowerCase());
+    ? visibleRequests
+    : visibleRequests.filter(r => r.urgency_level === selectedFilter.toLowerCase());
 
   const getUrgencyColor = (urgency: string) => {
     switch (urgency) {
@@ -65,7 +91,7 @@ export default function RequestsScreen() {
     }
   };
 
-  const criticalCount = requests.filter(r => r.urgency_level === 'critical' || r.urgency_level === 'high').length;
+  const criticalCount = visibleRequests.filter(r => r.urgency_level === 'critical' || r.urgency_level === 'high').length;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -120,7 +146,7 @@ export default function RequestsScreen() {
         {/* Stats Cards */}
         <View style={styles.statsSection}>
           <View style={styles.statCard}>
-            <ThemedText style={styles.statNumber}>{requests.length}</ThemedText>
+            <ThemedText style={styles.statNumber}>{visibleRequests.length}</ThemedText>
             <ThemedText style={styles.statLabel}>Active</ThemedText>
           </View>
           <View style={styles.statCard}>
@@ -152,14 +178,24 @@ export default function RequestsScreen() {
               const urgencyColor = getUrgencyColor(req.urgency_level);
               const timeAgo = getTimeAgo(req.created_at);
               const requesterName = req.institution_name || req.profiles?.full_name || 'Unknown';
+              const donationStatus = requestStatuses.get(req.id);
+              const statusCfg = donationStatus ? STATUS_CONFIG[donationStatus] : null;
 
               return (
                 <TouchableOpacity
                   key={req.id}
-                  style={styles.requestCard}
+                  style={[styles.requestCard, statusCfg && { borderWidth: 2, borderColor: statusCfg.borderColor, backgroundColor: statusCfg.cardBg }]}
                   activeOpacity={0.7}
                   onPress={() => router.push({ pathname: '/blood-request/[id]', params: { id: req.id } } as any)}
                 >
+                  {/* Donation status badge */}
+                  {statusCfg && (
+                    <View style={[styles.donationStatusBadge, { backgroundColor: statusCfg.bg }]}>
+                      <Ionicons name={statusCfg.icon as any} size={14} color={statusCfg.color} />
+                      <ThemedText style={[styles.donationStatusBadgeText, { color: statusCfg.color }]}>{statusCfg.label}</ThemedText>
+                    </View>
+                  )}
+
                   {/* Card Header */}
                   <View style={styles.requestHeader}>
                     <View style={styles.requestInfo}>
@@ -210,14 +246,23 @@ export default function RequestsScreen() {
                   {/* Footer */}
                   <View style={styles.requestFooter}>
                     <View style={styles.footerLeft}>
-                      <View style={[styles.bloodTypeCircle, { borderColor: urgencyColor }]}>
-                        <ThemedText style={[styles.bloodTypeCircleText, { color: urgencyColor }]}>{req.blood_type_needed}</ThemedText>
+                      <View style={[styles.bloodTypeCircle, { borderColor: statusCfg ? statusCfg.color : urgencyColor }]}>
+                        <ThemedText style={[styles.bloodTypeCircleText, { color: statusCfg ? statusCfg.color : urgencyColor }]}>{req.blood_type_needed}</ThemedText>
                       </View>
                     </View>
-                    <View style={styles.actionButton}>
-                      <ThemedText style={styles.actionButtonText}>View Details</ThemedText>
-                      <MaterialIcons name="chevron-right" size={16} color="#FFFFFF" />
-                    </View>
+                    {statusCfg ? (
+                      <View style={[styles.stateActionButton, { backgroundColor: statusCfg.bg }]}>
+                        <ThemedText style={[styles.stateActionButtonText, { color: statusCfg.color }]}>
+                          {donationStatus === 'scheduled' || donationStatus === 'confirmed' ? 'View Commitment' : 'View Details'}
+                        </ThemedText>
+                        <MaterialIcons name="chevron-right" size={16} color={statusCfg.color} />
+                      </View>
+                    ) : (
+                      <View style={styles.actionButton}>
+                        <ThemedText style={styles.actionButtonText}>View Details</ThemedText>
+                        <MaterialIcons name="chevron-right" size={16} color="#FFFFFF" />
+                      </View>
+                    )}
                   </View>
                 </TouchableOpacity>
               );
@@ -453,6 +498,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     gap: 4,
+  },
+  donationStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+  },
+  donationStatusBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  stateActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    gap: 4,
+  },
+  stateActionButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   actionButtonText: {
     fontSize: 13,

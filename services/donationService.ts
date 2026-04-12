@@ -106,6 +106,33 @@ export async function cancelDonation(donationId: string) {
   return { data, error };
 }
 
+/** Check if a donor already has an active (non-cancelled, non-completed) donation */
+export async function getActiveDonation(donorId: string) {
+  const { data, error } = await supabase
+    .from('donations')
+    .select('*, blood_requests(blood_type_needed, urgency_level), institutions(institution_name)')
+    .eq('donor_id', donorId)
+    .in('status', ['scheduled', 'confirmed'])
+    .limit(1)
+    .maybeSingle();
+
+  return { data, error };
+}
+
+/** Get the most recent donation for a donor + blood request (any status) */
+export async function getDonationForRequest(donorId: string, bloodRequestId: string) {
+  const { data, error } = await supabase
+    .from('donations')
+    .select('*')
+    .eq('donor_id', donorId)
+    .eq('blood_request_id', bloodRequestId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return { data, error };
+}
+
 /** Update donation status (for institutions) */
 export async function updateDonationStatus(donationId: string, status: DonationStatus, unitsdonated?: number) {
   console.log('[iDonate:DonationService] updateDonationStatus', { donationId, status });
@@ -130,4 +157,34 @@ export async function updateDonationStatus(donationId: string, status: DonationS
   }
 
   return { data, error };
+}
+
+/**
+ * Get a map of blood_request_id → DonationStatus for all of a donor's
+ * request-linked donations. When a request has multiple donations (e.g.
+ * cancelled then re-accepted), the most recent one wins.
+ */
+export async function getDonorRequestStatuses(donorId: string): Promise<{
+  statuses: Map<string, DonationStatus>;
+  error: any;
+}> {
+  const { data, error } = await supabase
+    .from('donations')
+    .select('blood_request_id, status, created_at')
+    .eq('donor_id', donorId)
+    .not('blood_request_id', 'is', null)
+    .order('created_at', { ascending: false });
+
+  const statuses = new Map<string, DonationStatus>();
+
+  if (data) {
+    for (const d of data) {
+      // First (most recent) entry per request wins
+      if (d.blood_request_id && !statuses.has(d.blood_request_id)) {
+        statuses.set(d.blood_request_id, d.status as DonationStatus);
+      }
+    }
+  }
+
+  return { statuses, error };
 }

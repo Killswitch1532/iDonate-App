@@ -1,4 +1,5 @@
 import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform, Alert } from 'react-native';
 import { supabase } from '@/lib/supabase';
@@ -30,9 +31,6 @@ export async function registerForPushNotifications(): Promise<string | null> {
   }
 
   try {
-    // Lazy import to avoid crash in Expo Go
-    const Notifications = await import('expo-notifications');
-
     // Configure foreground behavior
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
@@ -93,7 +91,6 @@ export async function setupNotificationListeners(
   if (isExpoGo()) return () => {};
 
   try {
-    const Notifications = await import('expo-notifications');
     const subscription = Notifications.addNotificationResponseReceivedListener(response => {
       const data = response.notification.request.content.data || {};
       console.log('[iDonate:Notifications] Tapped notification', data);
