@@ -189,7 +189,7 @@ export async function getNearbyInstitutions(
     userLat: number,
     userLon: number,
     radiusKm: number = 10
-): Promise<{ data: Array<Institution & { distance: number }> | null; error: any }> {
+): Promise<{ data: Array<Institution & { distance: number; latitude: number; longitude: number }> | null; error: any }> {
     const { data, error } = await getInstitutions();
     if (error || !data) return { data: null, error };
 
@@ -199,7 +199,7 @@ export async function getNearbyInstitutions(
             if (!parsed) return null;
             const distance = getHaversineDistance(userLat, userLon, parsed.lat, parsed.lng);
             if (distance > radiusKm) return null;
-            return { ...inst, distance: Math.round(distance * 10) / 10 };
+            return { ...inst, distance: Math.round(distance * 10) / 10, latitude: parsed.lat, longitude: parsed.lng };
         })
         .filter(Boolean)
         .sort((a: any, b: any) => a.distance - b.distance);

@@ -1,283 +1,294 @@
-import { MaterialIcons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import React, { useState } from "react";
+import { MaterialIcons, Ionicons } from "@expo/vector-icons";
+import * as Location from "expo-location";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Dimensions,
+  Linking,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
+import { getNearbyInstitutions } from "@/services/institutionService";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+type InstitutionWithDistance = {
+  id: string;
+  institution_name: string;
+  address: string | null;
+  phone?: string | null;
+  institution_type?: "hospital" | "blood_bank";
+  distance: number;
+  latitude: number;
+  longitude: number;
+};
 
 export default function MapScreen() {
-  const [selectedFilter, setSelectedFilter] = useState<string>("Hospitals");
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  const mapRef = useRef<MapView>(null);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [institutions, setInstitutions] = useState<InstitutionWithDistance[]>([]);
+  const [selectedCenter, setSelectedCenter] = useState<InstitutionWithDistance | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
-  const filters = ["All", "Hospitals", "Blood banks", "Open now"];
+  useEffect(() => {
+    loadData();
+  }, []);
 
-  const nearbyCenters = [
-    {
-      id: 1,
-      name: "Sunrise Blood Bank",
-      avatar: "person",
-      details: "Accepts O+, O-, A+ • Closes 7 pm",
-      distance: "2.4 km",
-    },
-    {
-      id: 2,
-      name: "Metro Clinic",
-      avatar: "person",
-      details: "AB+ drive • Today 3-6 pm",
-      distance: "3.1 km",
-    },
-    {
-      id: 3,
-      name: "City Community Center",
-      avatar: "person",
-      details: "Drive this weekend • All types",
-      distance: "4.0 km",
-    },
-  ];
+  async function loadData() {
+    setLoading(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        setLocationError("Location permission denied. Please enable it in settings.");
+        setLoading(false);
+        return;
+      }
+
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+      setUserLocation(coords);
+
+      // Fetch nearby institutions (50km radius to get plenty of results)
+      const { data, error } = await getNearbyInstitutions(coords.latitude, coords.longitude, 50);
+
+      if (!error && data) {
+        const parsed: InstitutionWithDistance[] = data.map((inst: any) => ({
+          id: inst.id,
+          institution_name: inst.institution_name,
+          address: inst.address,
+          phone: inst.profiles?.phone_number || null,
+          institution_type: inst.institution_type,
+          distance: inst.distance,
+          latitude: inst.latitude,
+          longitude: inst.longitude,
+        }));
+        setInstitutions(parsed);
+      }
+    } catch (e: any) {
+      console.error("[iDonate:Map] Error loading data:", e.message);
+      setLocationError("Could not fetch your location. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const centerOnUser = useCallback(() => {
+    if (userLocation && mapRef.current) {
+      mapRef.current.animateToRegion({
+        ...userLocation,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      }, 500);
+    }
+  }, [userLocation]);
+
+  const focusMarker = useCallback((inst: InstitutionWithDistance) => {
+    setSelectedCenter(inst);
+    if (mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude: inst.latitude,
+        longitude: inst.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      }, 400);
+    }
+  }, []);
+
+  const openDirections = (inst: InstitutionWithDistance) => {
+    const url = Platform.select({
+      ios: `maps:0,0?q=${inst.latitude},${inst.longitude}`,
+      android: `google.navigation:q=${inst.latitude},${inst.longitude}`,
+    });
+    if (url) Linking.openURL(url);
+  };
+
+  const callCenter = (phone: string) => {
+    Linking.openURL(`tel:${phone}`);
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#E74C3C" />
+          <ThemedText style={styles.loadingText}>Finding nearby donation centers...</ThemedText>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (locationError) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.loadingContainer}>
+          <Ionicons name="location-outline" size={48} color="#BDC3C7" />
+          <ThemedText style={styles.errorTitle}>Location Required</ThemedText>
+          <ThemedText style={styles.errorText}>{locationError}</ThemedText>
+          <TouchableOpacity style={styles.retryButton} onPress={loadData}>
+            <ThemedText style={styles.retryButtonText}>Try Again</ThemedText>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.contentContainer}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <MaterialIcons
-              name="favorite"
-              size={24}
-              color="#E74C3C"
-              style={styles.heartIcon}
-            />
-            <ThemedText type="logo" style={styles.logoText}>
-              iDonate
-            </ThemedText>
-          </View>
-          <ThemedText style={styles.headerSubtitle}>
-            Donation centers map
-          </ThemedText>
-        </View>
-
-        {/* Navigation and Title */}
-        <View style={styles.titleSection}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <View style={styles.container}>
+        {/* Map */}
+        {userLocation && (
+          <MapView
+            ref={mapRef}
+            style={styles.map}
+            provider={PROVIDER_GOOGLE}
+            initialRegion={{
+              ...userLocation,
+              latitudeDelta: 0.06,
+              longitudeDelta: 0.06,
+            }}
+            showsUserLocation
+            showsMyLocationButton={false}
+            onPress={() => setSelectedCenter(null)}
           >
-            <MaterialIcons
-              name="arrow-back"
-              size={24}
-              color="#2C3E50"
-              style={styles.backIcon}
-            />
-          </TouchableOpacity>
-          <View style={styles.titleContent}>
-            <ThemedText style={styles.title}>Nearby Centers</ThemedText>
-            <ThemedText style={styles.titleSubtitle}>
-              Find hospitals & blood banks
-            </ThemedText>
-          </View>
-        </View>
+            {institutions.map((inst) => (
+              <Marker
+                key={inst.id}
+                coordinate={{ latitude: inst.latitude, longitude: inst.longitude }}
+                title={inst.institution_name}
+                description={`${inst.distance} km away`}
+                pinColor={inst.institution_type === "blood_bank" ? "#2563EB" : "#DC2626"}
+                onPress={() => focusMarker(inst)}
+              />
+            ))}
+          </MapView>
+        )}
 
-        {/* Search Bar */}
-        <View style={styles.searchSection}>
-          <View style={styles.searchBox}>
-            <MaterialIcons
-              name="search"
-              size={20}
-              color="#7F8C8D"
-              style={styles.searchIcon}
-            />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search location or center"
-              placeholderTextColor="#9AA4AB"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
-          <TouchableOpacity style={styles.locationButton}>
-            <MaterialIcons
-              name="my-location"
-              size={20}
-              color="#4A90E2"
-              style={styles.locationIcon}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.filterButton}>
-            <MaterialIcons
-              name="menu"
-              size={20}
-              color="#7F8C8D"
-              style={styles.filterIcon}
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* Map View */}
-        <View style={styles.mapContainer}>
-          <View style={styles.mapPlaceholder}>
-            <ThemedText style={styles.mapText}>Map View</ThemedText>
-            <ThemedText style={styles.mapSubtext}>
-              JAPANTOWN • GOLDEN GATE PARK • HAIGHT-ASHBURY
-            </ThemedText>
-            <ThemedText style={styles.mapSubtext}>
-              MISSION DISTRICT • STONESTOWN
-            </ThemedText>
-
-            {/* Map markers */}
-            <View style={styles.mapMarkers}>
-              <View style={styles.marker}>
-                <MaterialIcons
-                  name="local-hospital"
-                  size={16}
-                  color="#E74C3C"
-                  style={styles.markerIcon}
-                />
-                <ThemedText style={styles.markerText}>
-                  Laguna Honda Hospital
-                </ThemedText>
-              </View>
-              <View style={styles.marker}>
-                <MaterialIcons
-                  name="shopping-cart"
-                  size={16}
-                  color="#4A90E2"
-                  style={styles.markerIcon}
-                />
-                <ThemedText style={styles.markerText}>Trader Joe's</ThemedText>
-              </View>
-              <View style={styles.marker}>
-                <MaterialIcons
-                  name="museum"
-                  size={16}
-                  color="#8E44AD"
-                  style={styles.markerIcon}
-                />
-                <ThemedText style={styles.markerText}>
-                  Asian Art Museum
-                </ThemedText>
-              </View>
+        {/* Floating header */}
+        <View style={styles.floatingHeader}>
+          <View style={styles.headerPill}>
+            <Ionicons name="heart" size={18} color="#DC2626" />
+            <ThemedText style={styles.headerTitle}>Donation Centers</ThemedText>
+            <View style={styles.countBadge}>
+              <ThemedText style={styles.countText}>{institutions.length}</ThemedText>
             </View>
           </View>
         </View>
 
-        {/* Filter Buttons */}
-        <View style={styles.filtersSection}>
-          {filters.map((filter) => (
-            <TouchableOpacity
-              key={filter}
-              style={[
-                styles.filterChip,
-                selectedFilter === filter && styles.selectedFilterChip,
-              ]}
-              onPress={() => setSelectedFilter(filter)}
-            >
-              <ThemedText
-                style={[
-                  styles.filterText,
-                  selectedFilter === filter && styles.selectedFilterText,
-                ]}
-              >
-                {filter}
-              </ThemedText>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {/* My Location FAB */}
+        <TouchableOpacity style={styles.locationFab} onPress={centerOnUser}>
+          <MaterialIcons name="my-location" size={22} color="#2563EB" />
+        </TouchableOpacity>
 
         {/* Selected Center Card */}
-        <View style={styles.selectedCenterCard}>
-          <ThemedText style={styles.centerName}>
-            Central City Hospital
-          </ThemedText>
-          <View style={styles.centerDetails}>
-            <ThemedText style={styles.centerInfo}>
-              A+ • O- accepted • 1.2 km away
-            </ThemedText>
-            <ThemedText style={styles.openStatus}>Open</ThemedText>
-          </View>
-          <View style={styles.donationInfo}>
-            <View style={styles.avatarContainer}>
-              <MaterialIcons
-                name="person"
-                size={24}
-                color="#FFFFFF"
-                style={styles.centerAvatar}
-              />
-            </View>
-            <ThemedText style={styles.donationType}>
-              Walk-in donation
-            </ThemedText>
-          </View>
-          <ThemedText style={styles.operatingHours}>
-            Mon-Sat • 9:00-18:00
-          </ThemedText>
-
-          <View style={styles.centerActions}>
-            <TouchableOpacity style={styles.directionsButton}>
-              <ThemedText style={styles.directionsIcon}>📤</ThemedText>
-              <ThemedText style={styles.directionsText}>Directions</ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.callButton}>
-              <ThemedText style={styles.callIcon}>📞</ThemedText>
-              <ThemedText style={styles.callText}>Call</ThemedText>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Nearby Options */}
-        <ThemedText style={styles.sectionTitle}>Nearby options</ThemedText>
-        <View style={styles.nearbyCentersList}>
-          {nearbyCenters.map((center) => (
-            <View key={center.id} style={styles.nearbyCenterCard}>
-              <View style={styles.nearbyCenterContent}>
-                <View style={styles.nearbyAvatar}>
-                  <ThemedText style={styles.nearbyAvatarEmoji}>
-                    {center.avatar}
-                  </ThemedText>
-                </View>
-                <View style={styles.nearbyCenterInfo}>
-                  <ThemedText style={styles.nearbyCenterName}>
-                    {center.name}
-                  </ThemedText>
-                  <ThemedText style={styles.nearbyCenterDetails}>
-                    {center.details}
-                  </ThemedText>
-                </View>
-                <ThemedText style={styles.nearbyDistance}>
-                  {center.distance}
+        {selectedCenter && (
+          <View style={styles.selectedCard}>
+            <View style={styles.selectedCardHeader}>
+              <View style={[styles.typeIcon, { backgroundColor: selectedCenter.institution_type === 'blood_bank' ? '#DBEAFE' : '#FEE2E2' }]}>
+                <Ionicons
+                  name={selectedCenter.institution_type === 'blood_bank' ? 'water' : 'medkit'}
+                  size={20}
+                  color={selectedCenter.institution_type === 'blood_bank' ? '#2563EB' : '#DC2626'}
+                />
+              </View>
+              <View style={styles.selectedCardInfo}>
+                <ThemedText style={styles.selectedCardName} numberOfLines={1}>
+                  {selectedCenter.institution_name}
+                </ThemedText>
+                <ThemedText style={styles.selectedCardAddress} numberOfLines={1}>
+                  {selectedCenter.address || "Address not available"}
                 </ThemedText>
               </View>
+              <View style={styles.distancePill}>
+                <ThemedText style={styles.distanceText}>{selectedCenter.distance} km</ThemedText>
+              </View>
             </View>
-          ))}
-        </View>
+            <View style={styles.selectedCardActions}>
+              <TouchableOpacity
+                style={styles.directionsBtn}
+                onPress={() => openDirections(selectedCenter)}
+              >
+                <MaterialIcons name="directions" size={18} color="#2563EB" />
+                <ThemedText style={styles.directionsBtnText}>Directions</ThemedText>
+              </TouchableOpacity>
+              {selectedCenter.phone && (
+                <TouchableOpacity
+                  style={styles.callBtn}
+                  onPress={() => callCenter(selectedCenter.phone!)}
+                >
+                  <Ionicons name="call" size={16} color="#FFF" />
+                  <ThemedText style={styles.callBtnText}>Call</ThemedText>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={styles.closeBtn}
+                onPress={() => setSelectedCenter(null)}
+              >
+                <MaterialIcons name="close" size={18} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
-        {/* Bottom Buttons */}
-        <View style={styles.bottomButtons}>
-          <TouchableOpacity
-            style={styles.backButtonBottom}
-            onPress={() => router.back()}
+        {/* Bottom Sheet - Nearby list */}
+        <View style={styles.bottomSheet}>
+          <View style={styles.bottomSheetHandle} />
+          <ThemedText style={styles.bottomSheetTitle}>Nearby Centers</ThemedText>
+          <ScrollView
+            style={styles.centersList}
+            contentContainerStyle={styles.centersListContent}
+            showsVerticalScrollIndicator={false}
           >
-            <ThemedText style={styles.backButtonText}>Back</ThemedText>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.registerButton}>
-            <ThemedText style={styles.registerButtonText}>
-              Register to donate
-            </ThemedText>
-          </TouchableOpacity>
+            {institutions.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="search-outline" size={32} color="#BDC3C7" />
+                <ThemedText style={styles.emptyText}>No donation centers found nearby</ThemedText>
+              </View>
+            ) : (
+              institutions.map((inst) => {
+                const isSelected = selectedCenter?.id === inst.id;
+                return (
+                  <TouchableOpacity
+                    key={inst.id}
+                    style={[styles.centerCard, isSelected && styles.centerCardSelected]}
+                    activeOpacity={0.7}
+                    onPress={() => focusMarker(inst)}
+                  >
+                    <View style={[styles.centerIcon, { backgroundColor: inst.institution_type === 'blood_bank' ? '#DBEAFE' : '#FEE2E2' }]}>
+                      <Ionicons
+                        name={inst.institution_type === 'blood_bank' ? 'water' : 'medkit'}
+                        size={18}
+                        color={inst.institution_type === 'blood_bank' ? '#2563EB' : '#DC2626'}
+                      />
+                    </View>
+                    <View style={styles.centerInfo}>
+                      <ThemedText style={styles.centerName} numberOfLines={1}>
+                        {inst.institution_name}
+                      </ThemedText>
+                      <ThemedText style={styles.centerAddress} numberOfLines={1}>
+                        {inst.address || "No address listed"}
+                      </ThemedText>
+                    </View>
+                    <View style={styles.centerDistance}>
+                      <ThemedText style={styles.centerDistanceText}>{inst.distance} km</ThemedText>
+                      <MaterialIcons name="chevron-right" size={16} color="#BDC3C7" />
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </ScrollView>
         </View>
-
-        {/* Bottom spacer */}
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -289,393 +300,297 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: "#F8F4F4",
   },
-  contentContainer: {
-    padding: 16,
-    paddingBottom: 100,
+  map: {
+    width: "100%",
+    height: "100%",
   },
 
-  // Header
-  header: {
+  // Loading / Error
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
-    marginBottom: 24,
-    paddingTop: 24,
+    padding: 32,
   },
-  logoContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
+  loadingText: {
+    fontSize: 16,
+    color: "#7F8C8D",
+    marginTop: 16,
   },
-  heartIcon: {
-    fontSize: 24,
-    marginRight: 8,
-  },
-  logoText: {
-    fontSize: 28,
-    lineHeight: 34,
+  errorTitle: {
+    fontSize: 20,
     fontWeight: "bold",
     color: "#2C3E50",
+    marginTop: 16,
+    marginBottom: 8,
   },
-  headerSubtitle: {
+  errorText: {
     fontSize: 14,
     color: "#7F8C8D",
-  },
-
-  // Title Section
-  titleSection: {
-    flexDirection: "row",
-    alignItems: "center",
+    textAlign: "center",
+    lineHeight: 20,
     marginBottom: 24,
   },
-  backButton: {
+  retryButton: {
+    backgroundColor: "#DC2626",
+    borderRadius: 12,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+  },
+  retryButtonText: {
+    color: "#FFF",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+
+  // Floating header
+  floatingHeader: {
+    position: "absolute",
+    top: 12,
+    left: 16,
+    right: 16,
+    alignItems: "center",
+  },
+  headerPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF",
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#1E293B",
+  },
+  countBadge: {
+    backgroundColor: "#F1F5F9",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  countText: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: "#64748B",
+  },
+
+  // Location FAB
+  locationFab: {
+    position: "absolute",
+    right: 16,
+    bottom: 280,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#FFF",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+
+  // Selected card overlay
+  selectedCard: {
+    position: "absolute",
+    bottom: 260,
+    left: 16,
+    right: 16,
+    backgroundColor: "#FFF",
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  selectedCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 12,
+  },
+  typeIcon: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: "#E8F4FD",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 16,
-  },
-  backIcon: {
-    fontSize: 20,
-    color: "#4A90E2",
-  },
-  titleContent: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#2C3E50",
-    marginBottom: 4,
-  },
-  titleSubtitle: {
-    fontSize: 14,
-    color: "#7F8C8D",
-  },
-
-  // Search Section
-  searchSection: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 20,
-  },
-  searchBox: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  searchIcon: {
-    fontSize: 16,
-    marginRight: 12,
-    color: "#9AA4AB",
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: "#2C3E50",
-  },
-  locationButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  locationIcon: {
-    fontSize: 20,
-  },
-  filterButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  filterIcon: {
-    fontSize: 20,
-    color: "#2C3E50",
-  },
-
-  // Map Container
-  mapContainer: {
-    marginBottom: 20,
-  },
-  mapPlaceholder: {
-    height: 300,
-    backgroundColor: "#E8F4FD",
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
   },
-  mapText: {
-    fontSize: 18,
+  selectedCardInfo: {
+    flex: 1,
+  },
+  selectedCardName: {
+    fontSize: 16,
     fontWeight: "bold",
-    color: "#2C3E50",
-    marginBottom: 8,
+    color: "#1E293B",
+    marginBottom: 2,
   },
-  mapSubtext: {
+  selectedCardAddress: {
+    fontSize: 13,
+    color: "#64748B",
+  },
+  distancePill: {
+    backgroundColor: "#F0FDF4",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  distanceText: {
     fontSize: 12,
-    color: "#7F8C8D",
-    textAlign: "center",
-    marginBottom: 4,
+    fontWeight: "bold",
+    color: "#16A34A",
   },
-  mapMarkers: {
-    position: "absolute",
-    top: 20,
-    left: 20,
-    right: 20,
+  selectedCardActions: {
     flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  marker: {
+    gap: 10,
     alignItems: "center",
   },
-  markerIcon: {
-    fontSize: 24,
-    marginBottom: 4,
-  },
-  markerText: {
-    fontSize: 10,
-    color: "#7F8C8D",
-    textAlign: "center",
-  },
-
-  // Filter Buttons
-  filtersSection: {
+  directionsBtn: {
+    flex: 1,
     flexDirection: "row",
-    gap: 8,
-    marginBottom: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#EFF6FF",
+    borderRadius: 10,
+    paddingVertical: 10,
   },
-  filterChip: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  selectedFilterChip: {
-    backgroundColor: "#E8F4FD",
-  },
-  filterText: {
+  directionsBtnText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#7F8C8D",
+    color: "#2563EB",
   },
-  selectedFilterText: {
-    color: "#4A90E2",
+  callBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#DC2626",
+    borderRadius: 10,
+    paddingVertical: 10,
+  },
+  callBtnText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#FFF",
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#F1F5F9",
+    justifyContent: "center",
+    alignItems: "center",
   },
 
-  // Selected Center Card
-  selectedCenterCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
+  // Bottom sheet
+  bottomSheet: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 240,
+    backgroundColor: "#FFF",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 8,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 10,
   },
-  centerName: {
-    fontSize: 18,
+  bottomSheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#E2E8F0",
+    alignSelf: "center",
+    marginBottom: 12,
+  },
+  bottomSheetTitle: {
+    fontSize: 16,
     fontWeight: "bold",
-    color: "#2C3E50",
+    color: "#1E293B",
+    paddingHorizontal: 20,
     marginBottom: 8,
   },
-  centerDetails: {
+  centersList: {
+    flex: 1,
+  },
+  centersListContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+  },
+
+  // Center cards in list
+  centerCard: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 6,
+    backgroundColor: "#FAFAFA",
+  },
+  centerCardSelected: {
+    backgroundColor: "#EFF6FF",
+    borderWidth: 1,
+    borderColor: "#93C5FD",
+  },
+  centerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
   },
   centerInfo: {
-    fontSize: 14,
-    color: "#7F8C8D",
     flex: 1,
   },
-  openStatus: {
-    fontSize: 14,
-    color: "#7F8C8D",
-  },
-  donationInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  avatarContainer: {
-    marginRight: 8,
-  },
-  centerAvatar: {
-    fontSize: 20,
-  },
-  donationType: {
-    fontSize: 14,
-    color: "#2C3E50",
-  },
-  operatingHours: {
-    fontSize: 14,
-    color: "#7F8C8D",
-    marginBottom: 16,
-  },
-  centerActions: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  directionsButton: {
-    flex: 1,
-    backgroundColor: "#E8F4FD",
-    borderRadius: 8,
-    paddingVertical: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  directionsIcon: {
-    fontSize: 16,
-  },
-  directionsText: {
+  centerName: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#4A90E2",
+    color: "#1E293B",
+    marginBottom: 2,
   },
-  callButton: {
-    flex: 1,
-    backgroundColor: "#E74C3C",
-    borderRadius: 8,
-    paddingVertical: 12,
+  centerAddress: {
+    fontSize: 12,
+    color: "#64748B",
+  },
+  centerDistance: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
+    gap: 4,
   },
-  callIcon: {
-    fontSize: 16,
-  },
-  callText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#FFFFFF",
-  },
-
-  // Nearby Options
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#2C3E50",
-    marginBottom: 12,
-  },
-  nearbyCentersList: {
-    marginBottom: 24,
-  },
-  nearbyCenterCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  nearbyCenterContent: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  nearbyAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#F8F4F4",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  nearbyAvatarEmoji: {
-    fontSize: 20,
-  },
-  nearbyCenterInfo: {
-    flex: 1,
-  },
-  nearbyCenterName: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#2C3E50",
-    marginBottom: 4,
-  },
-  nearbyCenterDetails: {
-    fontSize: 14,
-    color: "#7F8C8D",
-  },
-  nearbyDistance: {
-    fontSize: 14,
+  centerDistanceText: {
+    fontSize: 12,
     fontWeight: "600",
     color: "#7F8C8D",
   },
 
-  // Bottom Buttons
-  bottomButtons: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 24,
-  },
-  backButtonBottom: {
-    flex: 1,
-    backgroundColor: "#E8F4FD",
-    borderRadius: 12,
-    paddingVertical: 16,
+  // Empty state
+  emptyState: {
+    padding: 24,
     alignItems: "center",
   },
-  backButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#4A90E2",
-  },
-  registerButton: {
-    flex: 1,
-    backgroundColor: "#E74C3C",
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-  registerButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#FFFFFF",
-  },
-
-  // Bottom spacer
-  bottomSpacer: {
-    height: 20,
+  emptyText: {
+    fontSize: 14,
+    color: "#7F8C8D",
+    marginTop: 8,
   },
 });
