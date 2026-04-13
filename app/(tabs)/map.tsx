@@ -3,7 +3,9 @@ import * as Location from "expo-location";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Dimensions,
+  Easing,
   Linking,
   Platform,
   ScrollView,
@@ -36,7 +38,9 @@ export default function MapScreen() {
   const [institutions, setInstitutions] = useState<InstitutionWithDistance[]>([]);
   const [selectedCenter, setSelectedCenter] = useState<InstitutionWithDistance | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const spinAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadData();
@@ -182,6 +186,27 @@ export default function MapScreen() {
             </View>
           </View>
         </View>
+
+        {/* Refresh FAB */}
+        <TouchableOpacity
+          style={styles.refreshFab}
+          onPress={() => {
+            setRefreshing(true);
+            Animated.loop(
+              Animated.timing(spinAnim, { toValue: 1, duration: 800, easing: Easing.linear, useNativeDriver: true })
+            ).start();
+            loadData().finally(() => {
+              spinAnim.stopAnimation();
+              spinAnim.setValue(0);
+              setRefreshing(false);
+            });
+          }}
+          disabled={refreshing}
+        >
+          <Animated.View style={{ transform: [{ rotate: spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}>
+            <MaterialIcons name="refresh" size={22} color={refreshing ? '#93C5FD' : '#2563EB'} />
+          </Animated.View>
+        </TouchableOpacity>
 
         {/* My Location FAB */}
         <TouchableOpacity style={styles.locationFab} onPress={centerOnUser}>
@@ -382,7 +407,23 @@ const styles = StyleSheet.create({
     color: "#64748B",
   },
 
-  // Location FAB
+  // FABs
+  refreshFab: {
+    position: "absolute",
+    right: 16,
+    bottom: 340,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#FFF",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 5,
+  },
   locationFab: {
     position: "absolute",
     right: 16,
