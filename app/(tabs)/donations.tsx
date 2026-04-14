@@ -6,7 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { ThemedText } from "@/components/themed-text";
 import { useAuth } from "@/contexts/AuthContext";
-import { getDonorDonations, cancelDonation, Donation } from "@/services/donationService";
+import { getDonorDonations, cancelDonation, confirmDonorDonation, Donation } from "@/services/donationService";
 
 export default function DonationsScreen() {
   const { user } = useAuth();
@@ -14,6 +14,7 @@ export default function DonationsScreen() {
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('all');
   const [cancelingId, setCancelingId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   const loadDonations = () => {
     if (user?.id) {
@@ -35,7 +36,6 @@ export default function DonationsScreen() {
     if (activeFilter === 'pending') return d.status === 'scheduled' || d.status === 'confirmed';
     return d.status === activeFilter;
   });
-
   const handleCancel = (donationId: string) => {
     Alert.alert(
       "Cancel Appointment",
@@ -51,6 +51,29 @@ export default function DonationsScreen() {
             setCancelingId(null);
             if (error) {
               Alert.alert("Cancellation Failed", "Could not cancel your appointment. Please try again.");
+            } else {
+              loadDonations(); // Refresh list to show updated status
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleConfirmDonation = (donationId: string) => {
+    Alert.alert(
+      "Confirm Donation",
+      "By clicking 'Yes', you confirm that you have successfully donated blood for this request.",
+      [
+        { text: "Not yet", style: "cancel" },
+        { 
+          text: "Yes, I donated", 
+          onPress: async () => {
+            setConfirmingId(donationId);
+            const { error } = await confirmDonorDonation(donationId);
+            setConfirmingId(null);
+            if (error) {
+              Alert.alert("Error", "Could not confirm your donation. Please try again.");
             } else {
               loadDonations(); // Refresh list to show updated status
             }
@@ -188,23 +211,49 @@ export default function DonationsScreen() {
                     </View>
                   )}
 
-                  {/* Cancel Action */}
-                  {donation.status === 'scheduled' && (
-                    <TouchableOpacity 
-                      style={styles.cancelBtn} 
-                      onPress={() => handleCancel(donation.id)}
-                      disabled={cancelingId === donation.id}
-                    >
-                      {cancelingId === donation.id ? (
-                        <ActivityIndicator size="small" color="#64748B" />
-                      ) : (
-                        <>
-                          <Ionicons name="close-circle-outline" size={16} color="#64748B" />
-                          <ThemedText style={styles.cancelBtnText}>Cancel Appointment</ThemedText>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  )}
+                  {/* Actions (Cancel / Confirm) */}
+                  <View style={styles.actionRow}>
+                    {donation.status === 'scheduled' && (
+                      <TouchableOpacity 
+                        style={styles.cancelBtn} 
+                        onPress={() => handleCancel(donation.id)}
+                        disabled={cancelingId === donation.id}
+                      >
+                        {cancelingId === donation.id ? (
+                          <ActivityIndicator size="small" color="#64748B" />
+                        ) : (
+                          <>
+                            <Ionicons name="close-circle-outline" size={16} color="#64748B" />
+                            <ThemedText style={styles.cancelBtnText}>Cancel</ThemedText>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    )}
+
+                    {!donation.donor_confirmed && (donation.status === 'scheduled' || donation.status === 'confirmed') && (
+                      <TouchableOpacity 
+                        style={styles.confirmBtn} 
+                        onPress={() => handleConfirmDonation(donation.id)}
+                        disabled={confirmingId === donation.id}
+                      >
+                        {confirmingId === donation.id ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <>
+                            <Ionicons name="checkmark-circle-outline" size={16} color="#FFFFFF" />
+                            <ThemedText style={styles.confirmBtnText}>I Have Donated</ThemedText>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    )}
+
+                    {donation.donor_confirmed && donation.status !== 'completed' && (
+                      <View style={styles.waitingBadge}>
+                        <Ionicons name="time-outline" size={14} color="#D97706" />
+                        <ThemedText style={styles.waitingText}>Waiting for Confirmation</ThemedText>
+                      </View>
+                    )}
+                  </View>
                 </View>
               );
             })}
@@ -408,19 +457,56 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   cancelBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: 12,
-    marginTop: 4,
   },
   cancelBtnText: {
     color: '#64748B',
     fontSize: 13,
+    fontWeight: '700',
+  },
+  confirmBtn: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    backgroundColor: '#16A34A',
+    borderRadius: 12,
+  },
+  confirmBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+  },
+  waitingBadge: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FEF3C7',
+    borderRadius: 12,
+  },
+  waitingText: {
+    color: '#D97706',
+    fontSize: 12,
     fontWeight: '700',
   },
 });

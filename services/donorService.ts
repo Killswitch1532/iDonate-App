@@ -3,6 +3,8 @@ import { supabase } from '@/lib/supabase';
 export type DonorProfile = {
     id: string;
     blood_type: string | null;
+    rh_factor: string | null;
+    genotype: string | null;
     birth_date: string | null;
     weight_kg: number | null;
     last_donation_date: string | null;
@@ -124,6 +126,19 @@ export function checkEligibility(donor: DonorProfile): {
     }
 
     return { eligible: reasons.length === 0, reasons };
+}
+
+/** 
+ * Check if the user has completed their basic blood profile.
+ * Genotype is optional.
+ */
+export function isBloodTypeComplete(profile: any): boolean {
+    if (!profile) return false;
+    
+    // Check both profile (flattened) and donors (nested) structures for safety
+    const bloodType = profile.blood_type || profile.donors?.blood_type;
+    
+    return !!bloodType;
 }
 
 function getAge(birthDate: Date): number {

@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 import { ThemedText } from "@/components/themed-text";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,9 +24,10 @@ export default function SignInScreen() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [bloodType, setBloodType] = useState("");
+  const [bloodType, setBloodType] = useState<string | null>(null);
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -33,7 +35,7 @@ export default function SignInScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
-  const bloodTypes = ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"];
+  const bloodTypes = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
@@ -55,15 +57,10 @@ export default function SignInScreen() {
         newErrors.fullName = "Full name is required";
       }
 
-      if (!bloodType) {
-        newErrors.bloodType = "Blood type is required";
-      }
-
       if (!phoneNumber.trim()) {
         newErrors.phoneNumber = "Phone number is required";
       }
-
-      if (!dateOfBirth.trim()) {
+      if (!dateOfBirth) {
         newErrors.dateOfBirth = "Date of birth is required";
       }
 
@@ -138,10 +135,13 @@ export default function SignInScreen() {
             });
           }
 
-          // Create donor row with blood_type and birth_date
+          // Create donor row
           console.log('[iDonate:SignIn] Creating donor profile for user', { userId: user.id });
+          const rhFactor = bloodType?.includes('+') ? '+' : bloodType?.includes('-') ? '-' : null;
+
           const { error: profileError } = await upsertDonorProfile(user.id, {
             blood_type: bloodType || null,
+            rh_factor: rhFactor,
             birth_date: dateOfBirth ? formatDateForDB(dateOfBirth) : null,
           });
           if (profileError) {
@@ -193,13 +193,40 @@ export default function SignInScreen() {
     }
   };
 
-  /** Convert DD/MM/YYYY to YYYY-MM-DD for Postgres */
-  const formatDateForDB = (dateStr: string): string => {
-    const parts = dateStr.split('/');
+  /** Convert Date or string to YYYY-MM-DD for Postgres */
+  const formatDateForDB = (date: Date | string): string => {
+    if (date instanceof Date) {
+      return date.toISOString().split('T')[0];
+    }
+    const parts = date.split('/');
     if (parts.length === 3) {
       return `${parts[2]}-${parts[1]}-${parts[0]}`;
     }
-    return dateStr;
+    return date;
+  };
+
+  /** Format Date for display (DD/MM/YYYY) */
+  const formatDateForDisplay = (date: Date): string => {
+    const d = date.getDate().toString().padStart(2, '0');
+    const m = (date.getMonth() + 1).toString().padStart(2, '0');
+    const y = date.getFullYear();
+    return `${d}/${m}/${y}`;
+  };
+
+  const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    // On Android, the picker closes automatically after selection
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    
+    if (event.type === 'set' && selectedDate) {
+      setDateOfBirth(selectedDate);
+      if (errors.dateOfBirth) {
+        setErrors((prev) => ({ ...prev, dateOfBirth: "" }));
+      }
+    } else if (event.type === 'dismissed') {
+      // User cancelled
+    }
   };
 
   const toggleAuthMode = () => {
@@ -209,9 +236,10 @@ export default function SignInScreen() {
     setPassword("");
     setConfirmPassword("");
     setFullName("");
-    setBloodType("");
+    setBloodType(null);
     setPhoneNumber("");
-    setDateOfBirth("");
+    setDateOfBirth(null);
+    setShowDatePicker(false);
   };
 
   return (
@@ -307,22 +335,19 @@ export default function SignInScreen() {
           {isSignUp && (
             <View style={styles.inputGroup}>
               <ThemedText style={styles.label}>
-                Blood Type <ThemedText style={styles.required}>*</ThemedText>
+                Blood Group <ThemedText style={{ color: '#7F8C8D', fontSize: 13, fontWeight: 'normal' }}>(Optional)</ThemedText>
               </ThemedText>
-              <View style={styles.bloodTypeGrid}>
+              <ThemedText style={{ color: '#7F8C8D', fontSize: 13, fontWeight: 'normal' }}>(You can skip if you don't know your blood group)</ThemedText>
+              <View style={[styles.bloodTypeGrid, { marginTop: 4 }]}>
                 {bloodTypes.map((type) => (
                   <TouchableOpacity
                     key={type}
                     style={[
                       styles.bloodTypeButton,
                       bloodType === type && styles.selectedBloodTypeButton,
-                      errors.bloodType && styles.errorBorder,
                     ]}
                     onPress={() => {
-                      setBloodType(type);
-                      if (errors.bloodType) {
-                        setErrors((prev) => ({ ...prev, bloodType: "" }));
-                      }
+                      setBloodType(bloodType === type ? null : type);
                     }}
                   >
                     <MaterialIcons
@@ -342,11 +367,6 @@ export default function SignInScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
-              {errors.bloodType && (
-                <ThemedText style={styles.errorText}>
-                  {errors.bloodType}
-                </ThemedText>
-              )}
             </View>
           )}
 
@@ -392,38 +412,35 @@ export default function SignInScreen() {
               <ThemedText style={styles.label}>
                 Date of Birth <ThemedText style={styles.required}>*</ThemedText>
               </ThemedText>
-              <View style={styles.inputContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.inputContainer,
+                  errors.dateOfBirth && styles.errorInput,
+                ]}
+                onPress={() => setShowDatePicker(true)}
+              >
                 <MaterialIcons
                   name="calendar-today"
                   size={20}
                   color="#7F8C8D"
                   style={styles.inputIcon}
                 />
-                <TextInput
-                  style={[
-                    styles.input,
-                    errors.dateOfBirth && styles.errorInput,
-                  ]}
-                  placeholder="DD/MM/YYYY"
-                  placeholderTextColor="#9AA4AB"
-                  value={dateOfBirth}
-                  onChangeText={(text) => {
-                    // Auto-format: insert slashes at DD/ and DD/MM/ positions
-                    const digits = text.replace(/[^0-9]/g, '').slice(0, 8);
-                    let formatted = '';
-                    for (let i = 0; i < digits.length; i++) {
-                      if (i === 2 || i === 4) formatted += '/';
-                      formatted += digits[i];
-                    }
-                    setDateOfBirth(formatted);
-                    if (errors.dateOfBirth) {
-                      setErrors((prev) => ({ ...prev, dateOfBirth: "" }));
-                    }
-                  }}
-                  keyboardType="number-pad"
-                  maxLength={10}
+                <ThemedText style={[styles.input, !dateOfBirth && { color: "#9AA4AB" }]}>
+                  {dateOfBirth ? formatDateForDisplay(dateOfBirth) : "Select your date of birth"}
+                </ThemedText>
+                <MaterialIcons name="arrow-drop-down" size={24} color="#7F8C8D" />
+              </TouchableOpacity>
+              
+              {showDatePicker && (
+                <DateTimePicker
+                  value={dateOfBirth || new Date(2000, 0, 1)}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={onDateChange}
+                  maximumDate={new Date()} // Can't be born in the future
                 />
-              </View>
+              )}
+              
               {errors.dateOfBirth && (
                 <ThemedText style={styles.errorText}>
                   {errors.dateOfBirth}

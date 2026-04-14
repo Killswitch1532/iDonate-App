@@ -17,6 +17,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "@/components/themed-text";
 import { useAuth } from "@/contexts/AuthContext";
 import { createBloodRequest } from "@/services/requestService";
+import { isBloodTypeComplete } from "@/services/donorService";
+import { BloodTypeGatingModal } from "@/components/BloodTypeGatingModal";
 
 export default function RequestBloodScreen() {
   const { user } = useAuth();
@@ -25,7 +27,6 @@ export default function RequestBloodScreen() {
   const [selectedUrgency, setSelectedUrgency] = useState<string>("");
   
   // Form data
-  const [unitsNeeded, setUnitsNeeded] = useState<string>("");
   const [purpose, setPurpose] = useState<string>("");
   const [locationText, setLocationText] = useState<string>("");
   const [contactPhone, setContactPhone] = useState<string>("");
@@ -40,6 +41,7 @@ export default function RequestBloodScreen() {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isLocating, setIsLocating] = useState<boolean>(false);
+  const [showGatingModal, setShowGatingModal] = useState(false);
 
   const bloodTypes = ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"];
   // Mapped to DB enum ('low', 'moderate', 'high', 'critical')
@@ -101,14 +103,10 @@ export default function RequestBloodScreen() {
     }
   };
 
-  // Validation function
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
 
     if (!selectedBloodType) newErrors.bloodType = "Please select a blood type";
-    if (!unitsNeeded || isNaN(Number(unitsNeeded)) || Number(unitsNeeded) <= 0) {
-      newErrors.unitsNeeded = "Please enter a valid number of units";
-    }
     if (!selectedUrgency) newErrors.urgency = "Please select urgency level";
     if (!purpose.trim()) newErrors.purpose = "Please specify the reason for request";
 
@@ -128,14 +126,22 @@ export default function RequestBloodScreen() {
       return;
     }
 
+    // --- BLOOD TYPE GATING CHECK ---
+    const { profile } = useAuth(); // Accessing latest profile
+    if (!isBloodTypeComplete(profile)) {
+      setShowGatingModal(true);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const descriptionText = `Reason: ${purpose}\nLocation: ${locationText || 'Not specified'}`;
       
       const { error } = await createBloodRequest({
         requester_id: user.id,
+        request_type: 'individual',
         blood_type_needed: selectedBloodType,
-        units_needed: parseInt(unitsNeeded, 10),
+        units_needed: null,
         urgency_level: selectedUrgency as 'low' | 'moderate' | 'high' | 'critical',
         description: descriptionText,
         date_needed: selectedDate.toISOString(),
@@ -210,26 +216,6 @@ export default function RequestBloodScreen() {
             ))}
           </View>
           {errors.bloodType && <ThemedText style={styles.errorText}>{errors.bloodType}</ThemedText>}
-        </View>
-
-        {/* Units Needed */}
-        <View style={styles.card}>
-          <ThemedText style={styles.label}>Units needed <ThemedText style={styles.required}>*</ThemedText></ThemedText>
-          <View style={styles.inputContainer}>
-            <MaterialIcons name="bloodtype" size={20} color="#7F8C8D" style={styles.inputIcon} />
-            <TextInput
-              style={[styles.input, errors.unitsNeeded && styles.errorInput]}
-              placeholder="e.g., 2"
-              placeholderTextColor="#9AA4AB"
-              value={unitsNeeded}
-              onChangeText={(text) => {
-                setUnitsNeeded(text);
-                if (errors.unitsNeeded) setErrors((prev) => ({ ...prev, unitsNeeded: "" }));
-              }}
-              keyboardType="numeric"
-            />
-          </View>
-          {errors.unitsNeeded && <ThemedText style={styles.errorText}>{errors.unitsNeeded}</ThemedText>}
         </View>
 
         {/* Urgency */}
@@ -363,6 +349,15 @@ export default function RequestBloodScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <BloodTypeGatingModal 
+        isVisible={showGatingModal}
+        onClose={() => setShowGatingModal(false)}
+        onSuccess={() => {
+          setShowGatingModal(false);
+          handleSubmit(); // Retry the original action
+        }}
+      />
     </SafeAreaView>
   );
 }

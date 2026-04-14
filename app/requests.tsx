@@ -202,8 +202,6 @@ export default function RequestsScreen() {
                       <ThemedText style={styles.patientName} numberOfLines={1}>{requesterName}</ThemedText>
                       <View style={styles.requestMeta}>
                         <ThemedText style={styles.bloodType}>{req.blood_type_needed}</ThemedText>
-                        <ThemedText style={styles.separator}>•</ThemedText>
-                        <ThemedText style={styles.units}>{req.units_needed} unit{req.units_needed > 1 ? 's' : ''}</ThemedText>
                         {req.patient_name && (
                           <>
                             <ThemedText style={styles.separator}>•</ThemedText>

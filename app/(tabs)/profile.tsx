@@ -42,6 +42,7 @@ export default function ProfileScreen() {
   const email = user?.email || 'Not set';
   const address = donorData?.address || 'Not set';
   const bloodType = donorData?.blood_type || null;
+  const genotype = donorData?.genotype || null;
 
   // --- Compute summary stats from real data ---
   const completedDonationsList = donations.filter(d => d.status === 'completed');
@@ -137,6 +138,7 @@ export default function ProfileScreen() {
                 <ThemedText style={styles.userDetails}>
                   {userType.charAt(0).toUpperCase() + userType.slice(1)}
                   {bloodType ? ` • ${bloodType}` : ''}
+                  {genotype ? ` • ${genotype}` : ''}
                 </ThemedText>
               </View>
             </View>
@@ -374,30 +376,39 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* My Blood Requests Section */}
+        <View style={styles.anonymousSection}>
+          <TouchableOpacity 
+            style={styles.anonymousCard}
+            onPress={() => router.push("/my-requests")}
+          >
+            <View style={styles.anonymousContent}>
+              <View style={styles.shieldContainer}>
+                <MaterialIcons name="bloodtype" size={24} color="#E74C3C" />
+              </View>
+              <View style={styles.anonymousText}>
+                <ThemedText style={styles.anonymousTitle}>My Blood Requests</ThemedText>
+                <ThemedText style={styles.anonymousDescription}>Track donations people made to you</ThemedText>
+              </View>
+              <MaterialIcons name="chevron-right" size={24} color="#BDC3C7" />
+            </View>
+          </TouchableOpacity>
+        </View>
+
         {/* Bottom Buttons */}
         <View style={styles.bottomButtons}>
           <TouchableOpacity
             style={styles.settingsButton}
             onPress={() => router.push("/settings")}
           >
-            <MaterialIcons
-              name="settings"
-              size={20}
-              color="#4A90E2"
-              style={styles.settingsIcon}
-            />
+            <MaterialIcons name="settings" size={20} color="#4A90E2" />
             <ThemedText style={styles.settingsText}>Settings</ThemedText>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.logoutButton}
             onPress={handleLogout}
           >
-            <MaterialIcons
-              name="logout"
-              size={20}
-              color="#FFFFFF"
-              style={styles.logoutIcon}
-            />
+            <MaterialIcons name="logout" size={20} color="#FFFFFF" />
             <ThemedText style={styles.logoutText}>Log out</ThemedText>
           </TouchableOpacity>
         </View>

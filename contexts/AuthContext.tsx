@@ -99,7 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async function fetchProfile(userId: string) {
         const { data, error } = await supabase
             .from('profiles')
-            .select('*, donors(blood_type, availability_status, last_donation_date)')
+            .select('*, donors(blood_type, rh_factor, genotype, availability_status, last_donation_date)')
             .eq('id', userId)
             .maybeSingle();
 
@@ -117,6 +117,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const enrichedProfile = {
                 ...data,
                 blood_type: data.donors?.blood_type || null,
+                rh_factor: data.donors?.rh_factor || null,
+                genotype: data.donors?.genotype || null,
                 availability_status: data.donors?.availability_status || null,
                 last_donation_date: data.donors?.last_donation_date || null
             };

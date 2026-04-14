@@ -23,6 +23,7 @@ import {
 } from '@/services/donorService';
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+const GENOTYPES = ['AA', 'AS', 'SS', 'AC', 'SC'];
 
 export default function EditProfileScreen() {
   const { user, profile, refreshProfile } = useAuth();
@@ -31,6 +32,7 @@ export default function EditProfileScreen() {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [bloodType, setBloodType] = useState<string | null>(null);
+  const [genotype, setGenotype] = useState<string | null>(null);
   const [address, setAddress] = useState('');
   const [weight, setWeight] = useState('');
   const [birthDate, setBirthDate] = useState('');
@@ -54,6 +56,7 @@ export default function EditProfileScreen() {
         const { data } = await getDonorProfile(user.id);
         if (data) {
           setBloodType(data.blood_type || null);
+          setGenotype(data.genotype || null);
           setAddress(data.address || '');
           setWeight(data.weight_kg ? String(data.weight_kg) : '');
           setBirthDate(data.birth_date || '');
@@ -82,7 +85,11 @@ export default function EditProfileScreen() {
 
       // Update donors table
       const donorUpdates: any = {};
-      if (bloodType) donorUpdates.blood_type = bloodType;
+      const rhFactor = bloodType?.includes('+') ? '+' : bloodType?.includes('-') ? '-' : null;
+      
+      donorUpdates.blood_type = bloodType;
+      donorUpdates.rh_factor = rhFactor;
+      donorUpdates.genotype = genotype;
       if (address.trim()) donorUpdates.address = address.trim();
       if (weight.trim()) donorUpdates.weight_kg = parseFloat(weight);
       if (birthDate.trim()) donorUpdates.birth_date = birthDate.trim();
@@ -205,7 +212,7 @@ export default function EditProfileScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <ThemedText style={styles.label}>Blood Type</ThemedText>
+              <ThemedText style={styles.label}>Blood Group</ThemedText>
               <View style={styles.bloodTypeGrid}>
                 {BLOOD_TYPES.map((type) => (
                   <TouchableOpacity
@@ -223,6 +230,31 @@ export default function EditProfileScreen() {
                       ]}
                     >
                       {type}
+                    </ThemedText>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <ThemedText style={styles.label}>Genotype (Optional)</ThemedText>
+              <View style={styles.bloodTypeGrid}>
+                {GENOTYPES.map((gt) => (
+                  <TouchableOpacity
+                    key={gt}
+                    style={[
+                      styles.bloodTypeChip,
+                      genotype === gt && styles.bloodTypeChipSelected,
+                    ]}
+                    onPress={() => setGenotype(genotype === gt ? null : gt)}
+                  >
+                    <ThemedText
+                      style={[
+                        styles.bloodTypeText,
+                        genotype === gt && styles.bloodTypeTextSelected,
+                      ]}
+                    >
+                      {gt}
                     </ThemedText>
                   </TouchableOpacity>
                 ))}

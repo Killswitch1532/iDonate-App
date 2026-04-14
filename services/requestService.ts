@@ -5,8 +5,9 @@ export type BloodRequest = {
     requester_id: string;
     patient_name?: string;
     blood_type_needed: string;
-    units_needed: number;
+    units_needed?: number | null;
     urgency_level: 'critical' | 'high' | 'moderate' | 'low';
+    request_type?: 'individual' | 'institution';
     status?: 'pending' | 'fulfilled' | 'cancelled';
     description?: string;
     date_needed?: string;

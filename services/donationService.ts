@@ -11,6 +11,9 @@ export type Donation = {
   status: DonationStatus;
   units_donated: number | null;
   notes: string | null;
+  donor_confirmed: boolean;
+  institution_confirmed: boolean;
+  recipient_confirmed: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -188,3 +191,113 @@ export async function getDonorRequestStatuses(donorId: string): Promise<{
 
   return { statuses, error };
 }
+
+/**
+ * Donor confirms they have donated.
+ * If the institution has already confirmed, the donation auto-completes.
+ */
+export async function confirmDonorDonation(donationId: string) {
+  console.log('[iDonate:DonationService] confirmDonorDonation', { donationId });
+
+  // Set donor_confirmed = true
+  const { data, error } = await supabase
+    .from('donations')
+    .update({ donor_confirmed: true })
+    .eq('id', donationId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('[iDonate:DonationService] confirmDonorDonation failed', error.message);
+    return { data, error };
+  }
+
+  // If institution already confirmed, auto-complete
+  if (data?.institution_confirmed) {
+    const { data: completed, error: completeError } = await supabase
+      .from('donations')
+      .update({ status: 'completed' })
+      .eq('id', donationId)
+      .select()
+      .single();
+
+    if (completeError) {
+      console.error('[iDonate:DonationService] auto-complete failed', completeError.message);
+    }
+    return { data: completed || data, error: completeError };
+  }
+
+  return { data, error };
+}
+
+/**
+ * Get all donations made in response to a specific requester's blood requests.
+ * Used by individuals who requested blood to see who is donating.
+ */
+export async function getReceivedDonations(requesterId: string) {
+  console.log('[iDonate:DonationService] getReceivedDonations', { requesterId });
+
+  const { data, error } = await supabase
+    .from('donations')
+    .select(`
+      *,
+      donor:profiles!donor_id (
+        full_name,
+        avatar_url,
+        phone_number
+      ),
+      blood_requests!inner (
+        id,
+        requester_id,
+        blood_type_needed,
+        patient_name
+      )
+    `)
+    .eq('blood_requests.requester_id', requesterId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('[iDonate:DonationService] getReceivedDonations failed', error.message);
+  }
+
+  return { data, error };
+}
+
+/**
+ * Recipient (the person who requested blood) confirms they received the donation.
+ * If the donor has already confirmed, the donation auto-completes.
+ */
+export async function confirmRecipientDonation(donationId: string) {
+  console.log('[iDonate:DonationService] confirmRecipientDonation', { donationId });
+
+  // Set recipient_confirmed = true
+  const { data, error } = await supabase
+    .from('donations')
+    .update({ recipient_confirmed: true })
+    .eq('id', donationId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('[iDonate:DonationService] confirmRecipientDonation failed', error.message);
+    return { data, error };
+  }
+
+  // If donor already confirmed, auto-complete
+  if (data?.donor_confirmed) {
+    const { data: completed, error: completeError } = await supabase
+      .from('donations')
+      .update({ status: 'completed' })
+      .eq('id', donationId)
+      .select()
+      .single();
+
+    if (completeError) {
+      console.error('[iDonate:DonationService] auto-complete failed', completeError.message);
+    }
+    return { data: completed || data, error: completeError };
+  }
+
+  return { data, error };
+}
+

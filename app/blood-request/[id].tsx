@@ -4,6 +4,8 @@ import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { bookDonation, getActiveDonation, getDonationForRequest, DonationStatus } from '@/services/donationService';
+import { isBloodTypeComplete } from '@/services/donorService';
+import { BloodTypeGatingModal } from '@/components/BloodTypeGatingModal';
 import { Ionicons } from '@expo/vector-icons';
 
 // Visual config per donation status
@@ -60,6 +62,7 @@ export default function BloodRequestDetails() {
   const [thisRequestStatus, setThisRequestStatus] = useState<DonationStatus | null>(null);
   const [activeDonation, setActiveDonation] = useState<any>(null); // active donation for another request
   const [acceptanceLoading, setAcceptanceLoading] = useState(true);
+  const [showGatingModal, setShowGatingModal] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -116,6 +119,12 @@ export default function BloodRequestDetails() {
 
   const handleAccept = async () => {
     if (!user || !request || !institution) return;
+
+    // --- BLOOD TYPE GATING CHECK ---
+    if (!isBloodTypeComplete(profile)) {
+      setShowGatingModal(true);
+      return;
+    }
 
     Alert.alert(
       'Confirm Donation',
@@ -214,7 +223,7 @@ export default function BloodRequestDetails() {
           <Text style={styles.urgencyText}>{request.urgency_level.toUpperCase()}</Text>
         </View>
         <Text style={styles.bloodType}>{request.blood_type_needed}</Text>
-        <Text style={styles.units}>{request.units_needed} Unit{request.units_needed > 1 ? 's' : ''} Needed</Text>
+        <Text style={styles.units}>Blood Needed</Text>
       </View>
 
       {/* Donation status banner */}
@@ -371,6 +380,15 @@ export default function BloodRequestDetails() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      <BloodTypeGatingModal 
+        isVisible={showGatingModal}
+        onClose={() => setShowGatingModal(false)}
+        onSuccess={() => {
+          setShowGatingModal(false);
+          handleAccept(); // Retry original action
+        }}
+      />
     </ScrollView>
   );
 }
