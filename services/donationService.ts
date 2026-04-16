@@ -250,7 +250,10 @@ export async function getReceivedDonations(requesterId: string) {
         id,
         requester_id,
         blood_type_needed,
-        patient_name
+        patient_name,
+        status,
+        max_donors,
+        donors_confirmed_count
       )
     `)
     .eq('blood_requests.requester_id', requesterId)

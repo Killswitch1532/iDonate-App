@@ -63,6 +63,8 @@ export default function BloodRequestDetails() {
   const [activeDonation, setActiveDonation] = useState<any>(null); // active donation for another request
   const [acceptanceLoading, setAcceptanceLoading] = useState(true);
   const [showGatingModal, setShowGatingModal] = useState(false);
+  const [requestDonors, setRequestDonors] = useState<any[]>([]);
+  const [fetchingDonors, setFetchingDonors] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -105,6 +107,16 @@ export default function BloodRequestDetails() {
         } else if (activeReq.data && activeReq.data.blood_request_id !== requestData.id) {
           setActiveDonation(activeReq.data);
         }
+
+        // Fetch all donors for this request
+        setFetchingDonors(true);
+        const { data: donors } = await supabase
+          .from('donations')
+          .select('*, profiles:donor_id(full_name, avatar_url)')
+          .eq('blood_request_id', requestData.id)
+          .in('status', ['scheduled', 'confirmed', 'completed']);
+        setRequestDonors(donors || []);
+        setFetchingDonors(false);
       }
 
     } catch (error: any) {
@@ -196,12 +208,13 @@ export default function BloodRequestDetails() {
     return `Your blood type (${profile.blood_type}) is compatible with ${request.blood_type_needed} patients.`;
   };
 
-  // For cancelled/no_show, user can re-accept
-  const hasActiveCommitment = thisRequestStatus === 'scheduled' || thisRequestStatus === 'confirmed';
-  const isTerminalState = thisRequestStatus === 'completed';
-  const canReAccept = thisRequestStatus === 'cancelled' || thisRequestStatus === 'no_show';
-  // Can accept if: compatible, no current commitment to THIS request (or can re-accept), no active donation elsewhere
-  const canAccept = isCompatible() && !hasActiveCommitment && !isTerminalState && !activeDonation && !acceptanceLoading;
+  // Can accept if: 
+  // 1. Compatible 
+  // 2. No current commitment to THIS request (or can re-accept)
+  // 3. No active donation elsewhere
+  // 4. Request is NOT yet full (confirmed + scheduled < max_donors)
+  const isFull = (request.donors_confirmed_count || 0) + requestDonors.filter((d: any) => d.status === 'scheduled' || d.status === 'confirmed').length >= (request.max_donors || 1);
+  const canAccept = isCompatible() && !hasActiveCommitment && !isTerminalState && !activeDonation && !acceptanceLoading && !isFull && request.status !== 'completed';
 
   if (loading) {
     return (
@@ -219,12 +232,41 @@ export default function BloodRequestDetails() {
       
       {/* Header Info */}
       <View style={styles.header}>
-        <View style={[styles.urgencyBadge, { backgroundColor: getUrgencyColor(request.urgency_level) }]}>
-          <Text style={styles.urgencyText}>{request.urgency_level.toUpperCase()}</Text>
-        </View>
         <Text style={styles.bloodType}>{request.blood_type_needed}</Text>
-        <Text style={styles.units}>Blood Needed</Text>
+        <Text style={styles.units}>
+          {request.max_donors > 1 ? `${request.max_donors} Donors Needed` : 'Blood Needed'}
+        </Text>
       </View>
+
+      {/* Multi-Donor Progress Bar */}
+      {request.max_donors > 0 && (
+        <View style={styles.progressCard}>
+          <View style={styles.progressHeader}>
+            <ThemedText style={styles.progressTitle}>Request Progress</ThemedText>
+            <ThemedText style={styles.progressCount}>
+              {request.donors_confirmed_count || 0} / {request.max_donors} Donors Confirmed
+            </ThemedText>
+          </View>
+          <View style={styles.progressBarBg}>
+            <View 
+              style={[
+                styles.progressBarFill, 
+                { width: `${Math.min(((request.donors_confirmed_count || 0) / request.max_donors) * 100, 100)}%` }
+              ]} 
+            />
+          </View>
+          {request.status === 'completed' ? (
+            <View style={styles.progressNote}>
+              <Ionicons name="checkmark-circle" size={14} color="#16A34A" />
+              <ThemedText style={styles.progressNoteText}>This request has been successfully fulfilled!</ThemedText>
+            </View>
+          ) : (
+            <ThemedText style={styles.progressSubtext}>
+              {requestDonors.length} volunteer{requestDonors.length !== 1 ? 's' : ''} currently coordinating.
+            </ThemedText>
+          )}
+        </View>
+      )}
 
       {/* Donation status banner */}
       {thisRequestStatus && DETAIL_STATUS_CONFIG[thisRequestStatus] && (
@@ -334,14 +376,33 @@ export default function BloodRequestDetails() {
         )}
       </View>
 
-      {/* Description Card */}
-      {request.description && (
+          <Text style={styles.description}>{request.description}</Text>
+        </View>
+      )}
+
+      {/* Volunteer List (Social Proof / Progress) */}
+      {requestDonors.length > 0 && (
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Ionicons name="document-text" size={20} color="#64748B" />
-            <Text style={styles.cardTitle}>Notes</Text>
+            <Ionicons name="people" size={20} color="#64748B" />
+            <Text style={styles.cardTitle}>Current Volunteers</Text>
           </View>
-          <Text style={styles.description}>{request.description}</Text>
+          <View style={styles.donorAvatarList}>
+            {requestDonors.map((d, i) => (
+              <View key={d.id} style={[styles.miniAvatar, { marginLeft: i > 0 ? -12 : 0, zIndex: 10 - i }]}>
+                {d.profiles?.avatar_url ? (
+                  <Image source={{ uri: d.profiles.avatar_url }} style={styles.miniAvatarImg} />
+                ) : (
+                  <View style={styles.miniAvatarPlaceholder}>
+                    <Text style={styles.miniAvatarInitial}>{d.profiles?.full_name?.charAt(0) || '?'}</Text>
+                  </View>
+                )}
+              </View>
+            ))}
+            <ThemedText style={styles.volunteerCountText}>
+              {requestDonors.length} person responded
+            </ThemedText>
+          </View>
         </View>
       )}
 
@@ -410,6 +471,91 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
     paddingBottom: 40,
+  },
+  progressCard: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  progressTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#64748B',
+  },
+  progressCount: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#0F172A',
+  },
+  progressBarBg: {
+    height: 10,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 5,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#16A34A',
+    borderRadius: 5,
+  },
+  progressSubtext: {
+    fontSize: 12,
+    color: '#64748B',
+    fontStyle: 'italic',
+  },
+  progressNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  progressNoteText: {
+    fontSize: 12,
+    color: '#16A34A',
+    fontWeight: 'bold',
+  },
+  donorAvatarList: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  miniAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    overflow: 'hidden',
+    backgroundColor: '#F1F5F9',
+  },
+  miniAvatarImg: {
+    width: '100%',
+    height: '100%',
+  },
+  miniAvatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  miniAvatarInitial: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#64748B',
+  },
+  volunteerCountText: {
+    marginLeft: 12,
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '600',
   },
   centered: {
     flex: 1,

@@ -33,7 +33,7 @@ export default function DonationsScreen() {
 
   const filteredDonations = donations.filter(d => {
     if (activeFilter === 'all') return true;
-    if (activeFilter === 'pending') return d.status === 'scheduled' || d.status === 'confirmed';
+    if (activeFilter === 'pending') return ['scheduled', 'confirmed'].includes(d.status);
     return d.status === activeFilter;
   });
   const handleCancel = (donationId: string) => {

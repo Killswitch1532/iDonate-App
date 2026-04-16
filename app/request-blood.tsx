@@ -30,6 +30,7 @@ export default function RequestBloodScreen() {
   const [purpose, setPurpose] = useState<string>("");
   const [locationText, setLocationText] = useState<string>("");
   const [contactPhone, setContactPhone] = useState<string>("");
+  const [maxDonors, setMaxDonors] = useState<string>("1");
 
   // Date and time pickers
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -144,6 +145,7 @@ export default function RequestBloodScreen() {
         units_needed: null,
         urgency_level: selectedUrgency as 'low' | 'moderate' | 'high' | 'critical',
         description: descriptionText,
+        max_donors: parseInt(maxDonors, 10) || 1,
         date_needed: selectedDate.toISOString(),
         time_needed: selectedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
         contact_phone: contactPhone || undefined,
@@ -248,6 +250,23 @@ export default function RequestBloodScreen() {
             ))}
           </View>
           {errors.urgency && <ThemedText style={styles.errorText}>{errors.urgency}</ThemedText>}
+        </View>
+
+        {/* Number of Donors Needed */}
+        <View style={styles.card}>
+          <ThemedText style={styles.label}>Number of donors needed</ThemedText>
+          <ThemedText style={styles.subtitle}>How many people do you need to donate? (Default is 1)</ThemedText>
+          <View style={[styles.inputContainer, { marginTop: 12 }]}>
+            <MaterialIcons name="people" size={20} color="#7F8C8D" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. 1"
+              placeholderTextColor="#9AA4AB"
+              value={maxDonors}
+              onChangeText={(text) => setMaxDonors(text.replace(/[^0-9]/g, ""))}
+              keyboardType="number-pad"
+            />
+          </View>
         </View>
 
         {/* Preferred Date & Time */}

@@ -8,7 +8,10 @@ export type BloodRequest = {
     units_needed?: number | null;
     urgency_level: 'critical' | 'high' | 'moderate' | 'low';
     request_type?: 'individual' | 'institution';
-    status?: 'pending' | 'fulfilled' | 'cancelled';
+    status?: 'open' | 'matched' | 'in_progress' | 'completed' | 'cancelled' | 'expired';
+    max_donors?: number;
+    donors_confirmed_count?: number;
+    units_fulfilled?: number;
     description?: string;
     date_needed?: string;
     time_needed?: string;
@@ -35,7 +38,7 @@ export async function getActiveRequests() {
     const { data, error } = await supabase
         .from('blood_requests')
         .select('*, profiles:requester_id(full_name, avatar_url)')
-        .eq('status', 'pending')
+        .in('status', ['open', 'matched', 'in_progress'])
         .order('created_at', { ascending: false });
 
     if (error || !data || data.length === 0) return { data, error };
@@ -62,7 +65,6 @@ export async function getActiveRequests() {
     return { data: enriched, error: null };
 }
 
-/** Fetch requests created by a specific user */
 export async function getUserRequests(userId: string) {
     const { data, error } = await supabase
         .from('blood_requests')
@@ -73,10 +75,31 @@ export async function getUserRequests(userId: string) {
     return { data, error };
 }
 
+/** Fetch requests created by a specific user, enriched with donations and donor info */
+export async function getUserRequestsWithDonors(userId: string) {
+    const { data, error } = await supabase
+        .from('blood_requests')
+        .select(`
+            *,
+            donations (
+                *,
+                donor:profiles!donor_id (
+                    full_name,
+                    avatar_url,
+                    phone_number
+                )
+            )
+        `)
+        .eq('requester_id', userId)
+        .order('created_at', { ascending: false });
+
+    return { data, error };
+}
+
 /** Update request status (e.g. fulfilled, cancelled) */
 export async function updateRequestStatus(
     requestId: string,
-    status: 'pending' | 'fulfilled' | 'cancelled'
+    status: 'open' | 'matched' | 'in_progress' | 'completed' | 'cancelled' | 'expired'
 ) {
     const { data, error } = await supabase
         .from('blood_requests')
