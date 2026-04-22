@@ -177,7 +177,8 @@ export default function RequestsScreen() {
             filteredRequests.map((req: any) => {
               const urgencyColor = getUrgencyColor(req.urgency_level);
               const timeAgo = getTimeAgo(req.created_at);
-              const requesterName = req.institution_name || req.profiles?.full_name || 'Unknown';
+              const isOwnRequest = user?.id === req.requester_id;
+              const requesterName = isOwnRequest ? 'You' : (req.institution_name || req.profiles?.full_name || 'Unknown');
               const donationStatus = requestStatuses.get(req.id);
               const statusCfg = donationStatus ? STATUS_CONFIG[donationStatus] : null;
 
@@ -199,7 +200,14 @@ export default function RequestsScreen() {
                   {/* Card Header */}
                   <View style={styles.requestHeader}>
                     <View style={styles.requestInfo}>
-                      <ThemedText style={styles.patientName} numberOfLines={1}>{requesterName}</ThemedText>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <ThemedText style={styles.patientName} numberOfLines={1}>{requesterName}</ThemedText>
+                        {isOwnRequest && (
+                          <View style={styles.ownRequestBadge}>
+                            <ThemedText style={styles.ownRequestBadgeText}>Your Request</ThemedText>
+                          </View>
+                        )}
+                      </View>
                       <View style={styles.requestMeta}>
                         <ThemedText style={styles.bloodType}>{req.blood_type_needed}</ThemedText>
                         {req.patient_name && (
@@ -402,7 +410,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#2C3E50',
-    marginBottom: 4,
+  },
+  ownRequestBadge: {
+    backgroundColor: '#EBF5FF',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#93C5FD',
+  },
+  ownRequestBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#2563EB',
+    textTransform: 'uppercase',
   },
   requestMeta: {
     flexDirection: 'row',

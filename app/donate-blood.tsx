@@ -1,46 +1,46 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View, ActivityIndicator, Linking, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import Constants from 'expo-constants';
 
 // react-native-maps requires a dev build — gracefully degrade in Expo Go
 let MapView: any = null;
 let Marker: any = null;
+let Polyline: any = null;
 let mapsAvailable = false;
 try {
-  // Use try/catch to gracefully handle the absence of native modules (Expo Go)
   const maps = require('react-native-maps');
   if (maps) {
-    // MapView is generally the default export, but we check common patterns
     MapView = maps.default || maps.MapView || maps;
     Marker = maps.Marker;
-    // Only mark as available if we actually got the components needed
+    Polyline = maps.Polyline;
     mapsAvailable = !!MapView && !!Marker;
   }
 } catch (e) {
   console.log('[iDonate:DonateBlood] Maps module not available, falling back to static view');
 }
+const GOOGLE_MAPS_APIKEY = Constants.expoConfig?.android?.config?.googleMaps?.apiKey || '';
 
 import { ThemedText } from '@/components/themed-text';
 import { useAuth } from '@/contexts/AuthContext';
-import { getDonorProfile } from '@/services/donorService';
-import { getActiveRequests, BloodRequest } from '@/services/requestService';
-import { canDonateTo } from '@/services/matchingService';
-import { getInstitutions, Institution } from '@/services/institutionService';
+import { getDonorProfile, upsertDonorProfile } from '@/services/donorService';
+import { Institution, getNearbyInstitutions } from '@/services/institutionService';
 import { bookDonation } from '@/services/donationService';
 
 export default function DonateBloodScreen() {
   const { user } = useAuth();
   const [selectedBloodType, setSelectedBloodType] = useState<string>('');
   const [selectedRadius, setSelectedRadius] = useState<string>('10 km');
-  const [selectedFilter, setSelectedFilter] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [realRecipients, setRealRecipients] = useState<BloodRequest[]>([]);
-  const [realCenters, setRealCenters] = useState<Institution[]>([]);
+  const [realCenters, setRealCenters] = useState<(Institution & { distance: number; latitude: number; longitude: number })[]>([]);
+  const [isSavingBloodType, setIsSavingBloodType] = useState<boolean>(false);
+  const [routeCoords, setRouteCoords] = useState<{ latitude: number; longitude: number }[]>([]);
+  const mapRef = useRef<any>(null);
 
   // Location state
   const [locationText, setLocationText] = useState<string>('');
@@ -136,15 +136,20 @@ export default function DonateBloodScreen() {
           setSelectedBloodType(profile.blood_type);
         }
 
-        // Fetch Requests (Recipients)
-        const { data: requests, error: requestsError } = await getActiveRequests();
-        if (requestsError) throw requestsError;
-        setRealRecipients(requests || []);
-
-        // Fetch Institutions (Centers)
-        const { data: institutions, error: institutionsError } = await getInstitutions();
-        if (institutionsError) throw institutionsError;
-        setRealCenters(institutions || []);
+        // Fetch Institutions (Centers) - Use nearby service if coords available
+        const radiusNum = parseInt(selectedRadius);
+        if (locationCoords) {
+          const { data: institutions, error: instError } = await getNearbyInstitutions(
+            locationCoords.latitude,
+            locationCoords.longitude,
+            radiusNum
+          );
+          if (instError) throw instError;
+          setRealCenters(institutions || []);
+        } else {
+          // No location yet, wait for detectLocation to trigger another load or just show nothing yet
+          setRealCenters([]);
+        }
 
       } catch (err: any) {
         console.error('[iDonate:DonateBlood] Error loading data:', err);
@@ -155,9 +160,77 @@ export default function DonateBloodScreen() {
     }
 
     loadData();
-  }, [user]);
+  }, [user, locationCoords, selectedRadius]);
 
-  const filters = ['Urgent', 'Nearby', 'My Type', 'All'];
+  // Fit map to show all centers when they load
+  useEffect(() => {
+    if (mapsAvailable && mapRef.current && realCenters.length > 0 && locationCoords) {
+      const coordinates = [
+        { latitude: locationCoords.latitude, longitude: locationCoords.longitude },
+        ...realCenters.map(c => ({ latitude: c.latitude, longitude: c.longitude }))
+      ];
+      
+      mapRef.current.fitToCoordinates(coordinates, {
+        edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+        animated: true,
+      });
+    }
+  }, [realCenters]);
+
+  // Fetch route when a center is selected
+  useEffect(() => {
+    async function fetchRoute() {
+      if (!selectedCenter || !locationCoords || !mapsAvailable) {
+        setRouteCoords([]);
+        return;
+      }
+
+      const center = realCenters.find(c => c.id === selectedCenter);
+      if (!center) return;
+
+      try {
+        const url = `https://router.project-osrm.org/route/v1/driving/${locationCoords.longitude},${locationCoords.latitude};${center.longitude},${center.latitude}?overview=full&geometries=geojson`;
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.routes && data.routes.length > 0) {
+          const coords = data.routes[0].geometry.coordinates.map((c: any) => ({
+            latitude: c[1],
+            longitude: c[0],
+          }));
+          setRouteCoords(coords);
+
+          // Fit map to route
+          if (mapRef.current) {
+            mapRef.current.fitToCoordinates(coords, {
+              edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+              animated: true,
+            });
+          }
+        }
+      } catch (err) {
+        console.error('[iDonate:DonateBlood] OSRM routing error:', err);
+      }
+    }
+
+    fetchRoute();
+  }, [selectedCenter, locationCoords]);
+
+  const handleSetBloodType = async (type: string) => {
+    if (!user) return;
+    setIsSavingBloodType(true);
+    try {
+      const { error: updateError } = await upsertDonorProfile(user.id, { blood_type: type });
+      if (updateError) throw updateError;
+      setSelectedBloodType(type);
+    } catch (err: any) {
+      Alert.alert('Error', 'Failed to update blood type. Please try again.');
+    } finally {
+      setIsSavingBloodType(false);
+    }
+  };
+
+  const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -205,17 +278,32 @@ export default function DonateBloodScreen() {
               <View style={styles.bloodTypeBadgeRow}>
                 <MaterialIcons name="water-drop" size={20} color="#E74C3C" style={styles.sectionIcon} />
                 <ThemedText style={styles.bloodTypeBadgeLabel}>Your blood type</ThemedText>
-                <View style={styles.bloodTypeBadge}>
+                <View style={[styles.bloodTypeBadge, isSavingBloodType && { opacity: 0.5 }]}>
                   <ThemedText style={styles.bloodTypeBadgeText}>
                     {selectedBloodType || '—'}
                   </ThemedText>
                 </View>
-                {!selectedBloodType && (
-                  <ThemedText style={styles.bloodTypeMissing}>
-                    Update your profile to set blood type
-                  </ThemedText>
-                )}
+                {isSavingBloodType && <ActivityIndicator size="small" color="#E74C3C" style={{ marginLeft: 8 }} />}
               </View>
+
+              {!selectedBloodType && !isSavingBloodType && (
+                <View style={styles.bloodTypeSelection}>
+                  <ThemedText style={styles.bloodTypeSelectionLabel}>
+                    Select your blood type to get started:
+                  </ThemedText>
+                  <View style={styles.bloodTypeGrid}>
+                    {BLOOD_TYPES.map(type => (
+                      <TouchableOpacity
+                        key={type}
+                        style={styles.bloodTypeOption}
+                        onPress={() => handleSetBloodType(type)}
+                      >
+                        <ThemedText style={styles.bloodTypeOptionText}>{type}</ThemedText>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
 
               <View style={styles.inputRow}>
                 <View style={styles.inputContainer}>
@@ -266,6 +354,7 @@ export default function DonateBloodScreen() {
               <View style={styles.mapContainer}>
                 {locationCoords && mapsAvailable && MapView && Marker ? (
                   <MapView
+                    ref={mapRef}
                     style={styles.map}
                     initialRegion={{
                       latitude: locationCoords.latitude,
@@ -276,25 +365,29 @@ export default function DonateBloodScreen() {
                     showsUserLocation
                     showsMyLocationButton
                   >
+                    {/* Directions route */}
+                    {routeCoords.length > 0 && Polyline && (
+                      <Polyline
+                        coordinates={routeCoords}
+                        strokeWidth={4}
+                        strokeColor="#4A90E2"
+                      />
+                    )}
+
                     {/* Institution center markers */}
-                    {realCenters
-                      .filter((c: any) => c.location)
-                      .map((center: any) => {
-                        const coords = center.location?.coordinates;
-                        if (!coords || coords.length < 2) return null;
-                        return (
-                          <Marker
-                            key={center.id}
-                            coordinate={{
-                              latitude: coords[1],
-                              longitude: coords[0],
-                            }}
-                            title={center.institution_name}
-                            description={center.address || ''}
-                            pinColor={(center as any).profiles?.user_type === 'blood_bank' ? '#E74C3C' : '#4A90E2'}
-                          />
-                        );
-                      })}
+                    {realCenters.map((center) => (
+                      <Marker
+                        key={center.id}
+                        coordinate={{
+                          latitude: center.latitude,
+                          longitude: center.longitude,
+                        }}
+                        title={center.institution_name}
+                        description={center.address || ''}
+                        pinColor={(center as any).profiles?.user_type === 'blood_bank' ? '#E74C3C' : '#4A90E2'}
+                        onPress={() => setSelectedCenter(center.id)}
+                      />
+                    ))}
                   </MapView>
                 ) : locationCoords && !mapsAvailable ? (
                   /* Fallback when react-native-maps is not available (Expo Go) */
@@ -367,7 +460,7 @@ export default function DonateBloodScreen() {
                       <View style={styles.centerInfo}>
                         <ThemedText style={styles.centerName}>{center.institution_name}</ThemedText>
                         <ThemedText style={styles.centerDetails}>
-                          {center.address || 'Address not listed'}
+                          {center.distance != null ? `${center.distance} km away` : (center.address || 'Address not listed')}
                         </ThemedText>
                       </View>
                       {selectedCenter === center.id ? (
@@ -455,90 +548,6 @@ export default function DonateBloodScreen() {
                   }}
                 />
               )}
-            </View>
-
-            {/* Match Recipients Section */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <MaterialIcons name="group" size={20} color="#4A90E2" style={styles.sectionIcon} />
-                <ThemedText style={styles.sectionTitle}>Match Recipients</ThemedText>
-              </View>
-
-              <View style={styles.filterRow}>
-                {filters.map((filter) => (
-                  <TouchableOpacity
-                    key={filter}
-                    style={[
-                      styles.filterButton,
-                      selectedFilter === filter ? styles.selectedFilter : styles.unselectedFilter
-                    ]}
-                    onPress={() => setSelectedFilter(selectedFilter === filter ? '' : filter)}
-                  >
-                    <ThemedText style={[
-                      styles.filterText,
-                      selectedFilter === filter ? styles.selectedFilterText : styles.unselectedFilterText
-                    ]}>
-                      {filter}
-                    </ThemedText>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <View style={styles.recipientsList}>
-                {realRecipients.length === 0 ? (
-                  <ThemedText style={styles.emptyText}>No active requests found at the moment.</ThemedText>
-                ) : (
-                  realRecipients
-                    .filter(r => {
-                      if (selectedFilter === 'Urgent') return r.urgency_level === 'critical' || r.urgency_level === 'high';
-                      if (selectedFilter === 'My Type') {
-                        if (!selectedBloodType) return true;
-                        return canDonateTo(selectedBloodType, r.blood_type_needed);
-                      }
-                      return true;
-                    })
-                    .map((recipient) => {
-                      const requesterName = (recipient as any).institution_name || (recipient as any).profiles?.full_name || 'Unknown';
-                      return (
-                        <TouchableOpacity
-                          key={recipient.id}
-                          style={styles.recipientCard}
-                          activeOpacity={0.7}
-                          onPress={() => router.push({ pathname: '/blood-request/[id]', params: { id: recipient.id! } } as any)}
-                        >
-                          <View style={styles.recipientInfo}>
-                            <ThemedText style={styles.recipientName} numberOfLines={1}>{requesterName}</ThemedText>
-                            <ThemedText style={styles.recipientDetails}>
-                              {recipient.blood_type_needed} • {recipient.units_needed} unit{recipient.units_needed > 1 ? 's' : ''}{recipient.patient_name ? ` • ${recipient.patient_name}` : ''}
-                            </ThemedText>
-                            {recipient.description && (
-                              <ThemedText style={{ fontSize: 12, color: '#95A5A6', marginTop: 2, fontStyle: 'italic' }} numberOfLines={1}>
-                                {recipient.description}
-                              </ThemedText>
-                            )}
-                            <ThemedText style={styles.recipientTime}>
-                              {recipient.date_needed
-                                ? `Needed by ${new Date(recipient.date_needed).toLocaleDateString()}`
-                                : recipient.created_at
-                                  ? `Posted ${new Date(recipient.created_at).toLocaleDateString()}`
-                                  : 'Recently'}
-                            </ThemedText>
-                          </View>
-                          <View style={styles.recipientUrgency}>
-                            <View style={[
-                              styles.urgencyTag,
-                              (recipient.urgency_level === 'critical' || recipient.urgency_level === 'high') ? styles.urgentTag : styles.normalTag
-                            ]}>
-                              <ThemedText style={styles.urgencyText}>
-                                {recipient.urgency_level.charAt(0).toUpperCase() + recipient.urgency_level.slice(1)}
-                              </ThemedText>
-                            </View>
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })
-                )}
-              </View>
             </View>
 
             {/* Action Button */}
@@ -738,12 +747,39 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
-  bloodTypeMissing: {
-    fontSize: 12,
+  bloodTypeSelection: {
+    backgroundColor: '#FDF2F2',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+  },
+  bloodTypeSelectionLabel: {
+    fontSize: 14,
     color: '#E74C3C',
-    fontStyle: 'italic',
-    width: '100%',
-    marginTop: 4,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  bloodTypeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  bloodTypeOption: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E74C3C',
+    borderRadius: 8,
+    width: '22%',
+    aspectRatio: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bloodTypeOptionText: {
+    color: '#E74C3C',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 
   // Radius Button
@@ -892,84 +928,6 @@ const styles = StyleSheet.create({
     color: '#7F8C8D',
   },
 
-  // Filters
-  filterRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-  },
-  filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 16,
-  },
-  selectedFilter: {
-    backgroundColor: '#4A90E2',
-  },
-  unselectedFilter: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E8E8E8',
-  },
-  filterText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  selectedFilterText: {
-    color: '#FFFFFF',
-  },
-  unselectedFilterText: {
-    color: '#7F8C8D',
-  },
-
-  // Recipients
-  recipientsList: {
-    gap: 12,
-  },
-  recipientCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#F8F4F4',
-    borderRadius: 12,
-  },
-  recipientInfo: {
-    flex: 1,
-  },
-  recipientName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2C3E50',
-    marginBottom: 2,
-  },
-  recipientDetails: {
-    fontSize: 14,
-    color: '#7F8C8D',
-    marginBottom: 2,
-  },
-  recipientTime: {
-    fontSize: 12,
-    color: '#7F8C8D',
-  },
-  recipientUrgency: {
-    marginLeft: 12,
-  },
-  urgencyTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  urgentTag: {
-    backgroundColor: '#E74C3C',
-  },
-  normalTag: {
-    backgroundColor: '#27AE60',
-  },
-  urgencyText: {
-    fontSize: 12,
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
 
   // Action Button
   submitButton: {
