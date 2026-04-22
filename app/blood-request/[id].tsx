@@ -90,11 +90,12 @@ export default function BloodRequestDetails() {
       if (requestError) throw requestError;
       setRequest(requestData);
 
-      // Fetch institution details - use maybeSingle to prevent crash if not an institution
+      // Fetch institution details - use the explicit institution_id if it exists, otherwise assume the requester is an institution
+      const targetInstitutionId = requestData.institution_id || requestData.requester_id;
       const { data: instData } = await supabase
         .from('institutions')
         .select('*')
-        .eq('id', requestData.requester_id)
+        .eq('id', targetInstitutionId)
         .maybeSingle();
 
       if (instData) {

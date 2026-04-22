@@ -170,9 +170,20 @@ export default function RequestBloodScreen() {
       
       const descriptionText = `Reason: ${purpose}\nLocation: ${finalLocation}`;
       
+      let finalCenterId = selectedCenterId && !isOtherSelected ? selectedCenterId : undefined;
+      
+      // Auto-match if they used GPS or typed it manually
+      if (isOtherSelected && locationText) {
+        const match = centers.find(c => locationText.toLowerCase().includes(c.institution_name.toLowerCase()));
+        if (match) {
+          finalCenterId = match.id;
+        }
+      }
+
       const { error } = await createBloodRequest({
         requester_id: user.id,
         request_type: 'individual',
+        institution_id: finalCenterId,
         blood_type_needed: selectedBloodType,
         units_needed: null,
         urgency_level: selectedUrgency as 'low' | 'moderate' | 'high' | 'critical',
