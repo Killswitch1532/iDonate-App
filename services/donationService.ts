@@ -5,7 +5,7 @@ export type DonationStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelle
 export type Donation = {
   id: string;
   donor_id: string;
-  institution_id: string;
+  institution_id?: string | null;
   blood_request_id: string | null;
   scheduled_date: string;
   status: DonationStatus;
@@ -21,7 +21,7 @@ export type Donation = {
 /** Book a new donation appointment */
 export async function bookDonation(params: {
   donorId: string;
-  institutionId: string;
+  institutionId?: string;
   scheduledDate: Date;
   bloodRequestId?: string;
 }) {
@@ -35,7 +35,7 @@ export async function bookDonation(params: {
     .from('donations')
     .insert({
       donor_id: params.donorId,
-      institution_id: params.institutionId,
+      ...(params.institutionId ? { institution_id: params.institutionId } : {}),
       scheduled_date: params.scheduledDate.toISOString(),
       blood_request_id: params.bloodRequestId || null,
       status: 'scheduled',
@@ -71,7 +71,11 @@ export async function getDonorDonations(donorId: string) {
         )
       ),
       blood_requests (
-        blood_type_needed
+        blood_type_needed,
+        description,
+        profiles:requester_id (
+          full_name
+        )
       )
     `)
     .eq('donor_id', donorId)
