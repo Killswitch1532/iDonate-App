@@ -19,9 +19,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { createBloodRequest } from "@/services/requestService";
 import { isBloodTypeComplete } from "@/services/donorService";
 import { BloodTypeGatingModal } from "@/components/BloodTypeGatingModal";
+import { Institution, getInstitutions } from "@/services/institutionService";
 
 export default function RequestBloodScreen() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   
   const [selectedBloodType, setSelectedBloodType] = useState<string>("");
   const [selectedUrgency, setSelectedUrgency] = useState<string>("");
@@ -31,6 +32,12 @@ export default function RequestBloodScreen() {
   const [locationText, setLocationText] = useState<string>("");
   const [contactPhone, setContactPhone] = useState<string>("");
   const [maxDonors, setMaxDonors] = useState<string>("1");
+  
+  // Center selection
+  const [centers, setCenters] = useState<Institution[]>([]);
+  const [selectedCenterId, setSelectedCenterId] = useState<string | null>(null);
+  const [isOtherSelected, setIsOtherSelected] = useState<boolean>(false);
+  const [loadingCenters, setLoadingCenters] = useState<boolean>(false);
 
   // Date and time pickers
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -52,6 +59,22 @@ export default function RequestBloodScreen() {
     { label: "High", value: "high" },
     { label: "Critical", value: "critical" }
   ];
+
+  // Fetch verified centers
+  React.useEffect(() => {
+    async function fetchCenters() {
+      setLoadingCenters(true);
+      try {
+        const { data, error } = await getInstitutions();
+        if (data) setCenters(data);
+      } catch (err) {
+        console.error('Failed to fetch centers:', err);
+      } finally {
+        setLoadingCenters(false);
+      }
+    }
+    fetchCenters();
+  }, []);
 
   // Fetch location automatically
   const handleGetLocation = async () => {
@@ -95,6 +118,8 @@ export default function RequestBloodScreen() {
         // Remove duplicates adjacently or generally
         const uniqueParts = [...new Set(parts)];
         
+        setIsOtherSelected(true);
+        setSelectedCenterId(null);
         setLocationText(uniqueParts.join(', '));
       }
     } catch (error) {
@@ -128,7 +153,6 @@ export default function RequestBloodScreen() {
     }
 
     // --- BLOOD TYPE GATING CHECK ---
-    const { profile } = useAuth(); // Accessing latest profile
     if (!isBloodTypeComplete(profile)) {
       setShowGatingModal(true);
       return;
@@ -136,11 +160,30 @@ export default function RequestBloodScreen() {
 
     setIsSubmitting(true);
     try {
-      const descriptionText = `Reason: ${purpose}\nLocation: ${locationText || 'Not specified'}`;
+      let finalLocation = locationText || 'Not specified';
+      if (selectedCenterId && !isOtherSelected) {
+        const center = centers.find(c => c.id === selectedCenterId);
+        if (center) {
+           finalLocation = `${center.institution_name}${center.address ? `, ${center.address}` : ''}`;
+        }
+      }
       
+      const descriptionText = `Reason: ${purpose}\nLocation: ${finalLocation}`;
+      
+      let finalCenterId = selectedCenterId && !isOtherSelected ? selectedCenterId : undefined;
+      
+      // Auto-match if they used GPS or typed it manually
+      if (isOtherSelected && locationText) {
+        const match = centers.find(c => locationText.toLowerCase().includes(c.institution_name.toLowerCase()));
+        if (match) {
+          finalCenterId = match.id;
+        }
+      }
+
       const { error } = await createBloodRequest({
         requester_id: user.id,
         request_type: 'individual',
+        institution_id: finalCenterId,
         blood_type_needed: selectedBloodType,
         units_needed: null,
         urgency_level: selectedUrgency as 'low' | 'moderate' | 'high' | 'critical',
@@ -310,25 +353,77 @@ export default function RequestBloodScreen() {
           </View>
         </View>
 
-        {/* Location (with Address fetching) */}
+        {/* Location Section */}
         <View style={styles.card}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <ThemedText style={{ fontSize: 16, fontWeight: "600", color: "#2C3E50" }}>Location</ThemedText>
+            <ThemedText style={styles.label}>Location <ThemedText style={styles.required}>*</ThemedText></ThemedText>
             <TouchableOpacity onPress={handleGetLocation} disabled={isLocating} style={{ flexDirection: 'row', alignItems: 'center' }}>
               {isLocating ? <ActivityIndicator size="small" color="#E74C3C" /> : <MaterialIcons name="my-location" size={16} color="#E74C3C" />}
               <ThemedText style={{ color: "#E74C3C", fontSize: 12, fontWeight: '600', marginLeft: 4 }}>{isLocating ? 'Locating...' : 'Get current'}</ThemedText>
             </TouchableOpacity>
           </View>
-          <View style={styles.inputContainer}>
-            <MaterialIcons name="location-city" size={20} color="#7F8C8D" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Enter center or address (Optional)"
-              placeholderTextColor="#9AA4AB"
-              value={locationText}
-              onChangeText={setLocationText}
-            />
-          </View>
+
+          <ThemedText style={styles.subtitle}>Select a donation center or specify another location</ThemedText>
+          
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.centersScroll}>
+            {loadingCenters ? (
+              <ActivityIndicator color="#E74C3C" />
+            ) : (
+              <>
+                {centers.map((center) => (
+                  <TouchableOpacity
+                    key={center.id}
+                    style={[
+                      styles.centerOption,
+                      selectedCenterId === center.id && !isOtherSelected && styles.selectedCenterOption
+                    ]}
+                    onPress={() => {
+                      setSelectedCenterId(center.id);
+                      setIsOtherSelected(false);
+                    }}
+                  >
+                    <ThemedText style={[
+                      styles.centerOptionText,
+                      selectedCenterId === center.id && !isOtherSelected && styles.selectedCenterOptionText
+                    ]}>
+                      {center.institution_name}
+                    </ThemedText>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={[
+                    styles.centerOption,
+                    isOtherSelected && styles.selectedCenterOption
+                  ]}
+                  onPress={() => {
+                    setIsOtherSelected(true);
+                    setSelectedCenterId(null);
+                  }}
+                >
+                  <ThemedText style={[
+                    styles.centerOptionText,
+                    isOtherSelected && styles.selectedCenterOptionText
+                  ]}>
+                    Other / Custom
+                  </ThemedText>
+                </TouchableOpacity>
+              </>
+            )}
+          </ScrollView>
+
+          {isOtherSelected && (
+            <View style={[styles.inputContainer, { marginTop: 12 }]}>
+              <MaterialIcons name="location-city" size={20} color="#7F8C8D" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Enter center or address"
+                placeholderTextColor="#9AA4AB"
+                value={locationText}
+                onChangeText={setLocationText}
+                autoFocus
+              />
+            </View>
+          )}
         </View>
 
         {/* Reason for Request */}
@@ -417,6 +512,11 @@ const styles = StyleSheet.create({
   dateTimeButton: { flex: 1, backgroundColor: "#F8F4F4", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12, borderWidth: 1, borderColor: "#E5E5E5", flexDirection: "row", alignItems: "center" },
   dateTimeLabel: { fontSize: 12, color: "#7F8C8D", marginBottom: 2 },
   dateTimeValue: { fontSize: 14, fontWeight: "600", color: "#2C3E50" },
+  centersScroll: { marginTop: 12, marginBottom: 4 },
+  centerOption: { backgroundColor: "#F8F4F4", borderRadius: 8, paddingHorizontal: 16, paddingVertical: 10, marginRight: 8, borderWidth: 1, borderColor: "#E5E5E5", marginBottom: 8 },
+  selectedCenterOption: { backgroundColor: "#E74C3C", borderColor: "#E74C3C" },
+  centerOptionText: { fontSize: 13, fontWeight: "600", color: "#2C3E50" },
+  selectedCenterOptionText: { color: "#FFFFFF" },
   bottomButtons: { flexDirection: "row", gap: 12, marginTop: 16 },
   continueButton: { flex: 1, backgroundColor: "#E74C3C", borderRadius: 12, paddingVertical: 16, alignItems: "center", flexDirection: "row", justifyContent: "center" },
   continueText: { fontSize: 16, fontWeight: "600", color: "#FFFFFF" }

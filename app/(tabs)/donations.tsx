@@ -153,7 +153,17 @@ export default function DonationsScreen() {
           <View style={styles.listContainer}>
             {filteredDonations.map((donation: any) => {
               const statusColors = getStatusColor(donation.status);
-              const institutionName = donation.institutions?.institution_name || 'Medical Center';
+              
+              let institutionName = donation.institutions?.institution_name;
+              if (!institutionName && donation.blood_requests) {
+                const req = donation.blood_requests;
+                const name = req.profiles?.full_name || 'Individual';
+                const locationMatch = req.description?.match(/Location:\s*(.+)$/m);
+                const location = locationMatch ? locationMatch[1].trim() : 'Custom Location';
+                institutionName = `${name} (${location})`;
+              }
+              institutionName = institutionName || 'Medical Center';
+              
               const dateNeeded = donation.blood_requests?.date_needed;
               const timeNeeded = donation.blood_requests?.time_needed;
               const requestedType = donation.blood_requests?.blood_type_needed;

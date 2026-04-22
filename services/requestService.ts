@@ -8,6 +8,7 @@ export type BloodRequest = {
     units_needed?: number | null;
     urgency_level: 'critical' | 'high' | 'moderate' | 'low';
     request_type?: 'individual' | 'institution';
+    institution_id?: string | null;
     status?: 'open' | 'matched' | 'in_progress' | 'completed' | 'cancelled' | 'expired';
     max_donors?: number;
     donors_confirmed_count?: number;

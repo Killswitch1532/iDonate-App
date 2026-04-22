@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Linking, Image } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { bookDonation, getActiveDonation, getDonationForRequest, DonationStatus } from '@/services/donationService';
 import { isBloodTypeComplete } from '@/services/donorService';
 import { BloodTypeGatingModal } from '@/components/BloodTypeGatingModal';
+import { ThemedText } from '@/components/themed-text';
 import { Ionicons } from '@expo/vector-icons';
 
 // Visual config per donation status
@@ -65,6 +66,10 @@ export default function BloodRequestDetails() {
   const [showGatingModal, setShowGatingModal] = useState(false);
   const [requestDonors, setRequestDonors] = useState<any[]>([]);
   const [fetchingDonors, setFetchingDonors] = useState(false);
+  
+  const hasActiveCommitment = thisRequestStatus === 'scheduled' || thisRequestStatus === 'confirmed';
+  const isTerminalState = thisRequestStatus === 'completed' || thisRequestStatus === 'no_show' || thisRequestStatus === 'cancelled';
+  const canReAccept = thisRequestStatus === 'cancelled' || thisRequestStatus === 'no_show';
 
   useEffect(() => {
     fetchData();
@@ -85,15 +90,32 @@ export default function BloodRequestDetails() {
       if (requestError) throw requestError;
       setRequest(requestData);
 
-      // Fetch institution details
-      const { data: instData, error: instError } = await supabase
+      // Fetch institution details - use the explicit institution_id if it exists, otherwise assume the requester is an institution
+      const targetInstitutionId = requestData.institution_id || requestData.requester_id;
+      const { data: instData } = await supabase
         .from('institutions')
         .select('*')
-        .eq('id', requestData.requester_id)
-        .single();
+        .eq('id', targetInstitutionId)
+        .maybeSingle();
 
-      if (instError) throw instError;
-      setInstitution(instData);
+      if (instData) {
+        setInstitution(instData);
+      } else {
+        // If not an institution, fetch basic profile info for the individual requester
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('full_name, phone_number')
+          .eq('id', requestData.requester_id)
+          .maybeSingle();
+        
+        if (profileData) {
+          setInstitution({
+            institution_name: profileData.full_name,
+            phone: profileData.phone_number,
+            address: 'Individual Requester'
+          });
+        }
+      }
 
       // Check if user already has a donation for this request or another active
       if (user?.id && requestData?.id) {
@@ -213,8 +235,9 @@ export default function BloodRequestDetails() {
   // 2. No current commitment to THIS request (or can re-accept)
   // 3. No active donation elsewhere
   // 4. Request is NOT yet full (confirmed + scheduled < max_donors)
-  const isFull = (request.donors_confirmed_count || 0) + requestDonors.filter((d: any) => d.status === 'scheduled' || d.status === 'confirmed').length >= (request.max_donors || 1);
-  const canAccept = isCompatible() && !hasActiveCommitment && !isTerminalState && !activeDonation && !acceptanceLoading && !isFull && request.status !== 'completed';
+  const isOwnRequest = user?.id === request?.requester_id;
+  const isFull = (request?.donors_confirmed_count || 0) + requestDonors.filter((d: any) => d.status === 'scheduled' || d.status === 'confirmed').length >= (request?.max_donors || 1);
+  const canAccept = isCompatible() && !hasActiveCommitment && !isTerminalState && !activeDonation && !acceptanceLoading && !isFull && request?.status !== 'completed' && !isOwnRequest;
 
   if (loading) {
     return (
@@ -363,7 +386,7 @@ export default function BloodRequestDetails() {
           <Ionicons name="business" size={20} color="#64748B" />
           <Text style={styles.cardTitle}>Hospital Information</Text>
         </View>
-        <Text style={styles.institutionName}>{institution.institution_name}</Text>
+        <Text style={styles.institutionName}>{isOwnRequest ? 'You' : institution.institution_name}</Text>
         <Text style={styles.address}>{institution.address || 'Location information not available.'}</Text>
         {institution.phone && (
           <TouchableOpacity 
@@ -375,7 +398,13 @@ export default function BloodRequestDetails() {
           </TouchableOpacity>
         )}
       </View>
-
+      {/* Description Card */}
+      {request.description && (
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="information-circle-outline" size={20} color="#64748B" />
+            <Text style={styles.cardTitle}>Description</Text>
+          </View>
           <Text style={styles.description}>{request.description}</Text>
         </View>
       )}
@@ -408,7 +437,12 @@ export default function BloodRequestDetails() {
 
       {/* Actions */}
       <View style={styles.actions}>
-        {hasActiveCommitment || isTerminalState ? (
+        {isOwnRequest ? (
+          <View style={styles.ownRequestBanner}>
+            <Ionicons name="person-circle" size={24} color="#2563EB" />
+            <Text style={styles.ownRequestBannerText}>This is your own request</Text>
+          </View>
+        ) : hasActiveCommitment || isTerminalState ? (
           // Show status state button
           <View style={[styles.stateButton, { backgroundColor: DETAIL_STATUS_CONFIG[thisRequestStatus!].buttonBg, borderColor: DETAIL_STATUS_CONFIG[thisRequestStatus!].buttonBorder }]}>
             <Ionicons name={DETAIL_STATUS_CONFIG[thisRequestStatus!].icon as any} size={20} color={DETAIL_STATUS_CONFIG[thisRequestStatus!].buttonTextColor} />
@@ -774,5 +808,22 @@ const styles = StyleSheet.create({
     color: '#64748B',
     fontSize: 16,
     fontWeight: '600',
+  },
+  ownRequestBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#DBEAFE',
+    borderColor: '#93C5FD',
+    borderWidth: 1,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  ownRequestBannerText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1E40AF',
   },
 });

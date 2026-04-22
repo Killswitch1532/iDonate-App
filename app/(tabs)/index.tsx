@@ -288,7 +288,8 @@ export default function HomeScreen() {
                 critical: '#E74C3C', high: '#E67E22', moderate: '#F1C40F', low: '#27AE60',
               };
               const timeAgo = getTimeAgo(req.created_at);
-              const requesterName = req.institution_name || req.profiles?.full_name || 'Unknown';
+              const isOwnRequest = user?.id === req.requester_id;
+              const requesterName = isOwnRequest ? 'You' : (req.institution_name || req.profiles?.full_name || 'Unknown');
               const donationStatus = requestStatuses.get(req.id);
               const statusCfg = donationStatus ? STATUS_CONFIG[donationStatus] : null;
               return (
@@ -315,6 +316,11 @@ export default function HomeScreen() {
                         <ThemedText style={styles.requestTitle} numberOfLines={1}>
                           {requesterName}
                         </ThemedText>
+                        {isOwnRequest && (
+                          <View style={styles.ownRequestBadge}>
+                            <ThemedText style={styles.ownRequestBadgeText}>Your Request</ThemedText>
+                          </View>
+                        )}
                         {statusCfg && (
                           <View style={[styles.statusMiniTag, { backgroundColor: statusCfg.bg }]}>
                             <ThemedText style={[styles.statusMiniTagText, { color: statusCfg.color }]}>{statusCfg.label}</ThemedText>
@@ -678,6 +684,21 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#2C3E50",
     marginBottom: 4,
+  },
+  ownRequestBadge: {
+    backgroundColor: '#EBF5FF',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#93C5FD',
+    marginBottom: 4,
+  },
+  ownRequestBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#2563EB',
+    textTransform: 'uppercase',
   },
   requestSubtitle: {
     fontSize: 14,
