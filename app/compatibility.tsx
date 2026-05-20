@@ -1,4 +1,5 @@
 import { MaterialIcons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import React, { useState } from "react";
 import {
     ScrollView,
@@ -222,20 +223,28 @@ export default function CompatibilityScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <MaterialIcons
-              name="favorite"
-              size={24}
-              color="#E74C3C"
-              style={styles.heartIcon}
-            />
-            <ThemedText type="logo" style={styles.logoText}>
-              iDonate
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <MaterialIcons name="arrow-back" size={24} color="#2C3E50" />
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <View style={styles.logoContainer}>
+              <MaterialIcons
+                name="favorite"
+                size={24}
+                color="#E74C3C"
+                style={styles.heartIcon}
+              />
+              <ThemedText type="logo" style={styles.logoText}>
+                iDonate
+              </ThemedText>
+            </View>
+            <ThemedText style={styles.headerSubtitle}>
+              Blood Compatibility
             </ThemedText>
           </View>
-          <ThemedText style={styles.headerSubtitle}>
-            Blood Compatibility
-          </ThemedText>
         </View>
 
         {/* Title Section */}
@@ -513,7 +522,12 @@ const styles = StyleSheet.create({
   },
 
   // Header
+  backButton: {
+    marginRight: 16,
+    padding: 4,
+  },
   header: {
+    flexDirection: "row",
     alignItems: "center",
     marginBottom: 24,
     paddingTop: 24,

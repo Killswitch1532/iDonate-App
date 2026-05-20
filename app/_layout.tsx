@@ -103,7 +103,7 @@ function RootLayoutNav() {
         <Stack.Screen name="donate-blood" options={{ headerShown: false }} />
         <Stack.Screen name="search" options={{ headerShown: false }} />
         <Stack.Screen name="settings" options={{ headerShown: false }} />
-        <Stack.Screen name="requests" options={{ headerShown: false }} />
+        <Stack.Screen name="compatibility" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

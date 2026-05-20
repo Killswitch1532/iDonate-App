@@ -395,6 +395,25 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Blood Compatibility Guide */}
+        <View style={styles.anonymousSection}>
+          <TouchableOpacity 
+            style={styles.anonymousCard}
+            onPress={() => router.push("/compatibility")}
+          >
+            <View style={styles.anonymousContent}>
+              <View style={styles.shieldContainer}>
+                <MaterialIcons name="favorite" size={24} color="#E74C3C" />
+              </View>
+              <View style={styles.anonymousText}>
+                <ThemedText style={styles.anonymousTitle}>Blood Compatibility Guide</ThemedText>
+                <ThemedText style={styles.anonymousDescription}>Check blood type compatibility & facts</ThemedText>
+              </View>
+              <MaterialIcons name="chevron-right" size={24} color="#BDC3C7" />
+            </View>
+          </TouchableOpacity>
+        </View>
+
         {/* Bottom Buttons */}
         <View style={styles.bottomButtons}>
           <TouchableOpacity

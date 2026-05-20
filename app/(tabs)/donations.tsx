@@ -96,8 +96,6 @@ export default function DonationsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <Stack.Screen options={{ headerShown: false }} />
-      
       {/* Header */}
       <View style={styles.header}>
         <ThemedText style={styles.headerTitle}>My Donations</ThemedText>
@@ -270,6 +268,16 @@ export default function DonationsScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* FAB — Book a Donation */}
+      <TouchableOpacity
+        style={styles.fab}
+        activeOpacity={0.85}
+        onPress={() => router.navigate('/(tabs)/requests')}
+      >
+        <Ionicons name="add" size={26} color="#FFFFFF" />
+        <ThemedText style={styles.fabText}>Book Donation</ThemedText>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -299,6 +307,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: '#F8FAFC',
   },
+
   filterSection: {
     backgroundColor: '#FFFFFF',
     paddingBottom: 12,
@@ -332,7 +341,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 120,
     flexGrow: 1,
   },
   centerContainer: {
@@ -517,6 +526,28 @@ const styles = StyleSheet.create({
   waitingText: {
     color: '#D97706',
     fontSize: 12,
+    fontWeight: '700',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 100,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#E74C3C',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 28,
+    shadowColor: '#E74C3C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  fabText: {
+    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '700',
   },
 });

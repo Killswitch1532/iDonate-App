@@ -94,22 +94,17 @@ export default function RequestsScreen() {
   const criticalCount = visibleRequests.filter(r => r.urgency_level === 'critical' || r.urgency_level === 'high').length;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.contentContainer}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#E74C3C']} />
-        }
-      >
+    <View style={{ flex: 1, backgroundColor: '#F8F4F4' }}>
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.contentContainer}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#E74C3C']} />
+          }
+        >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <MaterialIcons name="arrow-back" size={24} color="#2C3E50" />
-          </TouchableOpacity>
           <View style={styles.headerContent}>
             <ThemedText style={styles.title}>Blood Requests</ThemedText>
             <ThemedText style={styles.subtitle}>Find and respond to urgent needs</ThemedText>
@@ -278,8 +273,19 @@ export default function RequestsScreen() {
 
         {/* Bottom spacer */}
         <View style={styles.bottomSpacer} />
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+      </SafeAreaView>
+
+      {/* FAB — Create a Request */}
+      <TouchableOpacity
+        style={styles.fab}
+        activeOpacity={0.85}
+        onPress={() => router.push('/request-blood')}
+      >
+        <Ionicons name="add" size={26} color="#FFFFFF" />
+        <ThemedText style={styles.fabText}>Create Request</ThemedText>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -294,7 +300,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 16,
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
 
   // Header
@@ -573,5 +579,27 @@ const styles = StyleSheet.create({
   // Bottom spacer
   bottomSpacer: {
     height: 20,
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 100,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#E74C3C',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 28,
+    shadowColor: '#E74C3C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  fabText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

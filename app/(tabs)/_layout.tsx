@@ -12,7 +12,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#4A90E2',
+        tabBarActiveTintColor: '#E74C3C',
         tabBarInactiveTintColor: '#9AA4AB',
         headerShown: false,
         tabBarButton: HapticTab,
@@ -51,14 +51,14 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="compatibility"
+        name="requests"
         options={{
-          title: 'Compatibility',
+          title: 'Requests',
           tabBarIcon: ({ color, focused }) => (
-            <IconSymbol 
-              size={24} 
-              name={focused ? "heart.fill" : "heart"} 
-              color={color} 
+            <MaterialIcons
+              name="bloodtype"
+              size={24}
+              color={color}
             />
           ),
         }}

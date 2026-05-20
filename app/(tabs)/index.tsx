@@ -264,7 +264,7 @@ export default function HomeScreen() {
           <ThemedText style={styles.sectionTitle}>Blood requests</ThemedText>
           <TouchableOpacity
             style={styles.requestsButton}
-            onPress={() => router.push("/requests")}
+            onPress={() => router.navigate("/(tabs)/requests")}
           >
             <ThemedText style={styles.requestsButtonText}>View all</ThemedText>
           </TouchableOpacity>
