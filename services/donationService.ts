@@ -1,5 +1,7 @@
 import { supabase } from '@/lib/supabase';
 
+const COOLDOWN_DAYS = 90;
+
 export type DonationStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
 
 export type Donation = {
@@ -227,6 +229,9 @@ export async function confirmDonorDonation(donationId: string) {
 
     if (completeError) {
       console.error('[iDonate:DonationService] auto-complete failed', completeError.message);
+    } else if (completed) {
+      // Client-side cooldown fallback (DB trigger is primary)
+      await updateDonorCooldown(completed.donor_id);
     }
     return { data: completed || data, error: completeError };
   }
@@ -301,10 +306,34 @@ export async function confirmRecipientDonation(donationId: string) {
 
     if (completeError) {
       console.error('[iDonate:DonationService] auto-complete failed', completeError.message);
+    } else if (completed) {
+      // Client-side cooldown fallback (DB trigger is primary)
+      await updateDonorCooldown(completed.donor_id);
     }
     return { data: completed || data, error: completeError };
   }
 
   return { data, error };
+}
+
+/**
+ * Update donor's cooldown fields after a completed donation.
+ * This is a client-side fallback; the DB trigger is the primary mechanism.
+ */
+async function updateDonorCooldown(donorId: string) {
+  try {
+    const now = new Date();
+    const nextEligible = new Date(now);
+    nextEligible.setDate(nextEligible.getDate() + COOLDOWN_DAYS);
+
+    await supabase.from('donors').update({
+      last_donation_date: now.toISOString().split('T')[0],
+      next_eligible_date: nextEligible.toISOString(),
+    }).eq('id', donorId);
+
+    console.log('[iDonate:DonationService] Donor cooldown updated', { donorId, nextEligible: nextEligible.toISOString() });
+  } catch (e) {
+    console.error('[iDonate:DonationService] updateDonorCooldown failed', e);
+  }
 }
 

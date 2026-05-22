@@ -9,6 +9,7 @@ import { ThemedText } from '@/components/themed-text';
 import { useAuth } from '@/contexts/AuthContext';
 import { getActiveRequests } from '@/services/requestService';
 import { getDonorRequestStatuses, DonationStatus } from '@/services/donationService';
+import { getDonorProfile, getCooldownStatus } from '@/services/donorService';
 
 // Status config for visual indicators
 const STATUS_CONFIG: Record<DonationStatus, { label: string; icon: string; color: string; bg: string; borderColor: string; cardBg: string }> = {
@@ -39,6 +40,7 @@ export default function RequestsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [requestStatuses, setRequestStatuses] = useState<Map<string, DonationStatus>>(new Map());
+  const [cooldownStatus, setCooldownStatus] = useState<{ isEligible: boolean; nextEligibleDate: Date | null; daysRemaining: number }>({ isEligible: true, nextEligibleDate: null, daysRemaining: 0 });
 
   const filters = ['All', 'Critical', 'High', 'Moderate', 'Low'];
 
@@ -53,6 +55,14 @@ export default function RequestsScreen() {
       if (requestsResult.error) throw requestsResult.error;
       setRequests(requestsResult.data || []);
       setRequestStatuses(statusesResult.statuses);
+
+      // Check cooldown
+      if (user?.id) {
+        const { data: donorProfile } = await getDonorProfile(user.id);
+        if (donorProfile) {
+          setCooldownStatus(getCooldownStatus(donorProfile));
+        }
+      }
     } catch (e) {
       console.error('[iDonate:Requests] Load error', e);
     } finally {
@@ -110,6 +120,16 @@ export default function RequestsScreen() {
             <ThemedText style={styles.subtitle}>Find and respond to urgent needs</ThemedText>
           </View>
         </View>
+
+        {/* Cooldown Banner */}
+        {!cooldownStatus.isEligible && (
+          <View style={styles.cooldownBanner}>
+            <Ionicons name="hourglass-outline" size={18} color="#D97706" />
+            <ThemedText style={styles.cooldownBannerText}>
+              Cooldown active — eligible again on {cooldownStatus.nextEligibleDate?.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} ({cooldownStatus.daysRemaining}d)
+            </ThemedText>
+          </View>
+        )}
 
         {/* Filter Buttons */}
         <View style={styles.filtersSection}>
@@ -601,5 +621,25 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',
+  },
+
+  // Cooldown Banner
+  cooldownBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  cooldownBannerText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#92400E',
+    fontWeight: '600',
   },
 });

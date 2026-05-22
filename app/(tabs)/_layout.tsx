@@ -3,7 +3,6 @@ import React from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function TabLayout() {
@@ -24,17 +23,17 @@ export default function TabLayout() {
           height: 80,
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
-          borderTopColor: '#E8E8E8',
+          borderTopColor: '#F0F0F0',
           shadowColor: '#000',
-          shadowOpacity: 0.1,
-          shadowOffset: { width: 0, height: -2 },
-          shadowRadius: 8,
-          elevation: 8,
+          shadowOpacity: 0.08,
+          shadowOffset: { width: 0, height: -3 },
+          shadowRadius: 12,
+          elevation: 10,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '500',
-          marginTop: 4,
+          fontSize: 11,
+          fontWeight: '600',
+          marginTop: 2,
         },
       }}>
       <Tabs.Screen
@@ -42,11 +41,7 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, focused }) => (
-            <IconSymbol 
-              size={24} 
-              name={focused ? "house.fill" : "house"} 
-              color={color} 
-            />
+            <MaterialIcons name={focused ? "home" : "home"} size={26} color={color} />
           ),
         }}
       />
@@ -55,11 +50,7 @@ export default function TabLayout() {
         options={{
           title: 'Requests',
           tabBarIcon: ({ color, focused }) => (
-            <MaterialIcons
-              name="bloodtype"
-              size={24}
-              color={color}
-            />
+            <MaterialIcons name="bloodtype" size={26} color={color} />
           ),
         }}
       />
@@ -68,11 +59,7 @@ export default function TabLayout() {
         options={{
           title: 'Map',
           tabBarIcon: ({ color, focused }) => (
-            <IconSymbol 
-              size={24} 
-              name={focused ? "map.fill" : "map"} 
-              color={color} 
-            />
+            <MaterialIcons name="map" size={26} color={color} />
           ),
         }}
       />
@@ -81,11 +68,7 @@ export default function TabLayout() {
         options={{
           title: 'Donations',
           tabBarIcon: ({ color, focused }) => (
-            <MaterialIcons
-              name="water-drop"
-              size={24}
-              color={color}
-            />
+            <MaterialIcons name="favorite" size={26} color={color} />
           ),
         }}
       />
@@ -94,11 +77,7 @@ export default function TabLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
-            <IconSymbol 
-              size={24} 
-              name={focused ? "person.fill" : "person"} 
-              color={color} 
-            />
+            <MaterialIcons name="person" size={26} color={color} />
           ),
         }}
       />

@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { bookDonation, getActiveDonation, getDonationForRequest, DonationStatus } from '@/services/donationService';
-import { isBloodTypeComplete } from '@/services/donorService';
+import { isBloodTypeComplete, getDonorProfile, getCooldownStatus } from '@/services/donorService';
 import { BloodTypeGatingModal } from '@/components/BloodTypeGatingModal';
 import { ThemedText } from '@/components/themed-text';
 import { Ionicons } from '@expo/vector-icons';
@@ -66,6 +66,7 @@ export default function BloodRequestDetails() {
   const [showGatingModal, setShowGatingModal] = useState(false);
   const [requestDonors, setRequestDonors] = useState<any[]>([]);
   const [fetchingDonors, setFetchingDonors] = useState(false);
+  const [cooldownStatus, setCooldownStatus] = useState<{ isEligible: boolean; nextEligibleDate: Date | null; daysRemaining: number }>({ isEligible: true, nextEligibleDate: null, daysRemaining: 0 });
   
   const hasActiveCommitment = thisRequestStatus === 'scheduled' || thisRequestStatus === 'confirmed';
   const isTerminalState = thisRequestStatus === 'completed' || thisRequestStatus === 'no_show' || thisRequestStatus === 'cancelled';
@@ -139,6 +140,12 @@ export default function BloodRequestDetails() {
           .in('status', ['scheduled', 'confirmed', 'completed']);
         setRequestDonors(donors || []);
         setFetchingDonors(false);
+
+        // Check donor cooldown eligibility
+        const { data: donorProfile } = await getDonorProfile(user.id);
+        if (donorProfile) {
+          setCooldownStatus(getCooldownStatus(donorProfile));
+        }
       }
 
     } catch (error: any) {
@@ -237,7 +244,7 @@ export default function BloodRequestDetails() {
   // 4. Request is NOT yet full (confirmed + scheduled < max_donors)
   const isOwnRequest = user?.id === request?.requester_id;
   const isFull = (request?.donors_confirmed_count || 0) + requestDonors.filter((d: any) => d.status === 'scheduled' || d.status === 'confirmed').length >= (request?.max_donors || 1);
-  const canAccept = isCompatible() && !hasActiveCommitment && !isTerminalState && !activeDonation && !acceptanceLoading && !isFull && request?.status !== 'completed' && !isOwnRequest;
+  const canAccept = isCompatible() && !hasActiveCommitment && !isTerminalState && !activeDonation && !acceptanceLoading && !isFull && request?.status !== 'completed' && !isOwnRequest && cooldownStatus.isEligible;
 
   if (loading) {
     return (
@@ -334,6 +341,23 @@ export default function BloodRequestDetails() {
               <Text style={styles.viewDonationsLinkText}>View My Donations</Text>
               <Ionicons name="arrow-forward" size={14} color="#2563EB" />
             </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Cooldown banner */}
+      {!cooldownStatus.isEligible && !thisRequestStatus && !activeDonation && (
+        <View style={styles.blockedBanner}>
+          <Ionicons name="hourglass-outline" size={24} color="#D97706" />
+          <View style={styles.acceptedBannerContent}>
+            <Text style={styles.blockedBannerTitle}>Donation Cooldown Active</Text>
+            <Text style={styles.blockedBannerSubtitle}>
+              You recently completed a donation. Based on platform safety rules, you will be eligible again on{' '}
+              {cooldownStatus.nextEligibleDate?.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}.
+            </Text>
+            <Text style={[styles.blockedBannerSubtitle, { marginTop: 4, fontWeight: '700' }]}>
+              {cooldownStatus.daysRemaining} day{cooldownStatus.daysRemaining !== 1 ? 's' : ''} remaining
+            </Text>
           </View>
         </View>
       )}
@@ -463,7 +487,7 @@ export default function BloodRequestDetails() {
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.acceptButtonText}>
-                {activeDonation ? 'Already Committed' : canReAccept ? 'Accept Again' : 'I want to Donate'}
+                {activeDonation ? 'Already Committed' : !cooldownStatus.isEligible ? `Cooldown (${cooldownStatus.daysRemaining}d)` : canReAccept ? 'Accept Again' : 'I want to Donate'}
               </Text>
             )}
           </TouchableOpacity>

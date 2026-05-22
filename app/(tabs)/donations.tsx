@@ -7,6 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { ThemedText } from "@/components/themed-text";
 import { useAuth } from "@/contexts/AuthContext";
 import { getDonorDonations, cancelDonation, confirmDonorDonation, Donation } from "@/services/donationService";
+import { getDonorProfile, getCooldownStatus } from "@/services/donorService";
 
 export default function DonationsScreen() {
   const { user } = useAuth();
@@ -15,10 +16,14 @@ export default function DonationsScreen() {
   const [activeFilter, setActiveFilter] = useState('all');
   const [cancelingId, setCancelingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [cooldownStatus, setCooldownStatus] = useState<{ isEligible: boolean; nextEligibleDate: Date | null; daysRemaining: number }>({ isEligible: true, nextEligibleDate: null, daysRemaining: 0 });
 
   const loadDonations = () => {
     if (user?.id) {
       setLoading(true);
+      getDonorProfile(user.id).then(({ data: donorProfile }) => {
+        if (donorProfile) setCooldownStatus(getCooldownStatus(donorProfile));
+      });
       getDonorDonations(user.id)
         .then(({ data }) => setDonations(data || []))
         .finally(() => setLoading(false));
@@ -271,12 +276,23 @@ export default function DonationsScreen() {
 
       {/* FAB — Book a Donation */}
       <TouchableOpacity
-        style={styles.fab}
+        style={[styles.fab, !cooldownStatus.isEligible && styles.fabDisabled]}
         activeOpacity={0.85}
-        onPress={() => router.navigate('/(tabs)/requests')}
+        onPress={() => {
+          if (!cooldownStatus.isEligible) {
+            Alert.alert(
+              'Donation Cooldown',
+              `You recently completed a donation. Based on platform safety rules, you will be eligible again on ${cooldownStatus.nextEligibleDate?.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}.\n\n${cooldownStatus.daysRemaining} day${cooldownStatus.daysRemaining !== 1 ? 's' : ''} remaining.`
+            );
+            return;
+          }
+          router.navigate('/(tabs)/requests');
+        }}
       >
         <Ionicons name="add" size={26} color="#FFFFFF" />
-        <ThemedText style={styles.fabText}>Book Donation</ThemedText>
+        <ThemedText style={styles.fabText}>
+          {cooldownStatus.isEligible ? 'Book Donation' : `Cooldown (${cooldownStatus.daysRemaining}d)`}
+        </ThemedText>
       </TouchableOpacity>
     </SafeAreaView>
   );
@@ -549,5 +565,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',
+  },
+  fabDisabled: {
+    backgroundColor: '#9CA3AF',
+    shadowColor: '#9CA3AF',
   },
 });

@@ -7,7 +7,7 @@ import { LinearGradient } from "expo-linear-gradient";
 
 import { ThemedText } from "@/components/themed-text";
 import { useAuth } from "@/contexts/AuthContext";
-import { getDonorProfile, DonorProfile } from "@/services/donorService";
+import { getDonorProfile, DonorProfile, getCooldownStatus } from "@/services/donorService";
 import { getDonorDonations, Donation } from "@/services/donationService";
 
 export default function ProfileScreen() {
@@ -149,42 +149,53 @@ export default function ProfileScreen() {
           {/* Donation Summary Cards (Overlapping the gradient) */}
           <View style={styles.summarySection}>
           <View style={styles.summaryCards}>
-            <View style={styles.donationCard}>
-              <MaterialIcons
-                name="water-drop"
-                size={24}
-                color="#E74C3C"
-                style={styles.cardIcon}
-              />
+            <TouchableOpacity
+              style={styles.donationCard}
+              activeOpacity={0.7}
+              onPress={() => Alert.alert(
+                '💧 Total Donations',
+                'This is the total number of donations you have completed through the iDonate platform.\n\nA donation is counted only after both you and the recipient/institution confirm it was received.',
+              )}
+            >
+              <View style={styles.kpiIconRow}>
+                <MaterialIcons name="water-drop" size={24} color="#E74C3C" style={styles.cardIcon} />
+                <MaterialIcons name="info-outline" size={14} color="#BDC3C7" />
+              </View>
               <ThemedText style={styles.donationNumber}>{completedDonationsCount > 0 ? completedDonationsCount : '—'}</ThemedText>
-              <ThemedText style={styles.donationLabel}>
-                Total Donations
-              </ThemedText>
-            </View>
-            <View style={styles.livesSavedCard}>
-              <MaterialIcons
-                name="favorite"
-                size={24}
-                color="#E74C3C"
-                style={styles.cardIcon}
-              />
+              <ThemedText style={styles.donationLabel}>Total Donations</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.livesSavedCard}
+              activeOpacity={0.7}
+              onPress={() => Alert.alert(
+                '❤️ Lives Saved',
+                'Each blood donation can potentially help save up to 3 lives.\n\nThis number is estimated as:\nTotal Completed Donations × 3\n\nThis is a widely recognized estimate used by organizations like the Red Cross.',
+              )}
+            >
+              <View style={styles.kpiIconRow}>
+                <MaterialIcons name="favorite" size={24} color="#E74C3C" style={styles.cardIcon} />
+                <MaterialIcons name="info-outline" size={14} color="#BDC3C7" />
+              </View>
               <ThemedText style={styles.livesSavedNumber}>{livesSaved > 0 ? livesSaved : '—'}</ThemedText>
-              <ThemedText style={styles.livesSavedLabel}>
-                Lives Saved
-              </ThemedText>
-            </View>
-            <View style={styles.lastDonationCard}>
-              <MaterialIcons
-                name="schedule"
-                size={24}
-                color="#4A90E2"
-                style={styles.cardIcon}
-              />
+              <ThemedText style={styles.livesSavedLabel}>Lives Saved</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.lastDonationCard}
+              activeOpacity={0.7}
+              onPress={() => Alert.alert(
+                '🕐 Days Since Last Donation',
+                'The number of days since your most recent completed donation.\n\nA 90-day cooldown period is enforced between donations to ensure donor safety. When this number reaches 90, you\'ll be eligible to donate again.',
+              )}
+            >
+              <View style={styles.kpiIconRow}>
+                <MaterialIcons name="schedule" size={24} color="#4A90E2" style={styles.cardIcon} />
+                <MaterialIcons name="info-outline" size={14} color="#BDC3C7" />
+              </View>
               <ThemedText style={styles.lastDonationNumber}>
                 {daysSinceLastDonation !== null ? daysSinceLastDonation : '—'}
               </ThemedText>
               <ThemedText style={styles.lastDonationLabel}>Days Ago</ThemedText>
-            </View>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -275,6 +286,33 @@ export default function ProfileScreen() {
             </View>
           </View>
         </View>
+
+        {/* Eligibility Status */}
+        {donorData && (() => {
+          const cooldown = getCooldownStatus(donorData);
+          return (
+            <View style={styles.eligibilitySection}>
+              <View style={[styles.eligibilityCard, cooldown.isEligible ? styles.eligibilityCardEligible : styles.eligibilityCardCooldown]}>
+                <MaterialIcons 
+                  name={cooldown.isEligible ? "check-circle" : "hourglass-empty"} 
+                  size={24} 
+                  color={cooldown.isEligible ? "#16A34A" : "#D97706"} 
+                />
+                <View style={{ flex: 1 }}>
+                  <ThemedText style={[styles.eligibilityTitle, { color: cooldown.isEligible ? '#166534' : '#92400E' }]}>
+                    {cooldown.isEligible ? 'Eligible to Donate' : 'Donation Cooldown'}
+                  </ThemedText>
+                  <ThemedText style={[styles.eligibilitySubtext, { color: cooldown.isEligible ? '#15803D' : '#A16207' }]}>
+                    {cooldown.isEligible 
+                      ? 'Based on platform rules, you are currently eligible to donate blood.'
+                      : `Eligible again on ${cooldown.nextEligibleDate?.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })} (${cooldown.daysRemaining} days)`
+                    }
+                  </ThemedText>
+                </View>
+              </View>
+            </View>
+          );
+        })()}
 
         {/* Donation History Section */}
         <View style={styles.historySection}>
@@ -585,6 +623,13 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 12,
   },
+  kpiIconRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 0,
+  },
   donationNumber: {
     fontSize: 22,
     fontWeight: "800",
@@ -875,5 +920,36 @@ const styles = StyleSheet.create({
   // Bottom spacer
   bottomSpacer: {
     height: 20,
+  },
+
+  // Eligibility Badge
+  eligibilitySection: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  eligibilityCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    gap: 12,
+    borderWidth: 1,
+  },
+  eligibilityCardEligible: {
+    backgroundColor: '#DCFCE7',
+    borderColor: '#BBF7D0',
+  },
+  eligibilityCardCooldown: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FDE68A',
+  },
+  eligibilityTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  eligibilitySubtext: {
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

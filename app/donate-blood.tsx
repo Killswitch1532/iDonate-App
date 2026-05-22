@@ -27,7 +27,7 @@ const GOOGLE_MAPS_APIKEY = Constants.expoConfig?.android?.config?.googleMaps?.ap
 
 import { ThemedText } from '@/components/themed-text';
 import { useAuth } from '@/contexts/AuthContext';
-import { getDonorProfile, upsertDonorProfile } from '@/services/donorService';
+import { getDonorProfile, upsertDonorProfile, getCooldownStatus } from '@/services/donorService';
 import { Institution, getNearbyInstitutions } from '@/services/institutionService';
 import { bookDonation } from '@/services/donationService';
 
@@ -58,6 +58,7 @@ export default function DonateBloodScreen() {
   const [dateChosen, setDateChosen] = useState<boolean>(false);
   const [timeChosen, setTimeChosen] = useState<boolean>(false);
   const [booking, setBooking] = useState<boolean>(false);
+  const [cooldownStatus, setCooldownStatus] = useState<{ isEligible: boolean; nextEligibleDate: Date | null; daysRemaining: number }>({ isEligible: true, nextEligibleDate: null, daysRemaining: 0 });
 
   const detectLocation = useCallback(async () => {
     setLocationLoading(true);
@@ -134,6 +135,10 @@ export default function DonateBloodScreen() {
         if (profileError) throw profileError;
         if (profile?.blood_type) {
           setSelectedBloodType(profile.blood_type);
+        }
+        // Check cooldown
+        if (profile) {
+          setCooldownStatus(getCooldownStatus(profile));
         }
 
         // Fetch Institutions (Centers) - Use nearby service if coords available
@@ -268,6 +273,22 @@ export default function DonateBloodScreen() {
 
         {!loading && !error && (
           <>
+            {/* Cooldown Banner */}
+            {!cooldownStatus.isEligible && (
+              <View style={styles.cooldownBanner}>
+                <MaterialIcons name="hourglass-empty" size={28} color="#D97706" />
+                <View style={{ flex: 1 }}>
+                  <ThemedText style={styles.cooldownTitle}>Donation Cooldown Active</ThemedText>
+                  <ThemedText style={styles.cooldownText}>
+                    You recently completed a donation. Based on platform safety rules, you will be eligible to donate again on{' '}
+                    {cooldownStatus.nextEligibleDate?.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}.
+                  </ThemedText>
+                  <ThemedText style={styles.cooldownDays}>
+                    {cooldownStatus.daysRemaining} day{cooldownStatus.daysRemaining !== 1 ? 's' : ''} remaining
+                  </ThemedText>
+                </View>
+              </View>
+            )}
             {/* Donation Details Section */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
@@ -554,9 +575,9 @@ export default function DonateBloodScreen() {
             <TouchableOpacity
               style={[
                 styles.submitButton,
-                (!selectedCenter || !dateChosen || !timeChosen || booking) && styles.submitButtonDisabled,
+                (!selectedCenter || !dateChosen || !timeChosen || booking || !cooldownStatus.isEligible) && styles.submitButtonDisabled,
               ]}
-              disabled={!selectedCenter || !dateChosen || !timeChosen || booking}
+              disabled={!selectedCenter || !dateChosen || !timeChosen || booking || !cooldownStatus.isEligible}
               onPress={async () => {
                 if (!user || !selectedCenter) return;
                 setBooking(true);
@@ -989,5 +1010,35 @@ const styles = StyleSheet.create({
     color: '#7F8C8D',
     padding: 20,
     fontStyle: 'italic',
+  },
+
+  // Cooldown Banner
+  cooldownBanner: {
+    flexDirection: 'row',
+    backgroundColor: '#FEF3C7',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    alignItems: 'flex-start',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  cooldownTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#92400E',
+    marginBottom: 4,
+  },
+  cooldownText: {
+    fontSize: 14,
+    color: '#A16207',
+    lineHeight: 20,
+  },
+  cooldownDays: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#92400E',
+    marginTop: 4,
   },
 });

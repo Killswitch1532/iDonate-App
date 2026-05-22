@@ -1,9 +1,11 @@
-import { MaterialIcons } from "@expo/vector-icons";
+import { MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Location from "expo-location";
 import React, { useState, useCallback } from "react";
 import {
   ActivityIndicator,
+  Linking,
+  Platform,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -11,18 +13,16 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
 
 import { ThemedText } from "@/components/themed-text";
-import Button from "@/components/ui/Button";
-import Card from "@/components/ui/Card";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/contexts/NotificationContext";
-import { getDonorProfile } from "@/services/donorService";
+import { getDonorProfile, getCooldownStatus } from "@/services/donorService";
 import { getNearbyInstitutionCount, getNearbyInstitutions } from "@/services/institutionService";
 import { getActiveRequests } from "@/services/requestService";
-import { getDonorDonations, getDonorRequestStatuses, DonationStatus } from "@/services/donationService";
+import { getDonorRequestStatuses, DonationStatus } from "@/services/donationService";
 
-// Status config for visual indicators on home cards
 const STATUS_CONFIG: Record<DonationStatus, { label: string; color: string; bg: string; borderColor: string; cardBg: string }> = {
   scheduled: { label: 'Scheduled', color: '#2563EB', bg: '#DBEAFE', borderColor: '#93C5FD', cardBg: '#EFF6FF' },
   confirmed: { label: 'Confirmed', color: '#D97706', bg: '#FEF3C7', borderColor: '#FDE68A', cardBg: '#FFFBEB' },
@@ -43,6 +43,17 @@ function getTimeAgo(dateStr: string): string {
   return `${days}d ago`;
 }
 
+const BLOOD_COMPAT = [
+  { type: 'O-', info: 'Donate to all', color: '#DC2626' },
+  { type: 'O+', info: 'To O+, A+, B+, AB+', color: '#EA580C' },
+  { type: 'A-', info: 'To A-, A+, AB-, AB+', color: '#16A34A' },
+  { type: 'A+', info: 'To A+, AB+', color: '#2563EB' },
+  { type: 'B-', info: 'To B-, B+, AB-, AB+', color: '#7C3AED' },
+  { type: 'B+', info: 'To B+, AB+', color: '#0891B2' },
+  { type: 'AB-', info: 'To AB-, AB+', color: '#BE185D' },
+  { type: 'AB+', info: 'Receive from all', color: '#4338CA' },
+];
+
 export default function HomeScreen() {
   const { user } = useAuth();
   const { newCount } = useNotifications();
@@ -51,58 +62,36 @@ export default function HomeScreen() {
   const [nearbyCenters, setNearbyCenters] = useState<{ count: number; radiusKm: number } | null>(null);
   const [nearbyInstitutions, setNearbyInstitutions] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
-  const [donations, setDonations] = useState<any[]>([]);
   const [requestStatuses, setRequestStatuses] = useState<Map<string, DonationStatus>>(new Map());
+  const [isEligible, setIsEligible] = useState(true);
   const [loading, setLoading] = useState(true);
-
 
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-
       async function fetchData() {
         setLoading(true);
-
-        // Fetch blood type
         const bloodTypePromise = (async () => {
           if (!user?.id) return;
           const { data } = await getDonorProfile(user.id);
-          if (!cancelled && data?.blood_type) {
-            setBloodType(data.blood_type);
+          if (!cancelled && data) {
+            if (data.blood_type) setBloodType(data.blood_type);
+            setIsEligible(getCooldownStatus(data).isEligible);
           }
         })();
-
-        // Fetch active requests
         const requestsPromise = (async () => {
           try {
             const { data } = await getActiveRequests();
             if (!cancelled && data) setRequests(data.slice(0, 5));
-          } catch (e) {
-            console.error('[iDonate:Home] Requests error', e);
-          }
+          } catch (e) { console.error('[iDonate:Home] Requests error', e); }
         })();
-
-        // Fetch user's donations + request statuses
-        const donationsPromise = (async () => {
+        const statusesPromise = (async () => {
           if (!user?.id) return;
           try {
-            const [donationsResult, statusesResult] = await Promise.all([
-              getDonorDonations(user.id),
-              getDonorRequestStatuses(user.id),
-            ]);
-            if (!cancelled && donationsResult.data) {
-              const upcoming = donationsResult.data.filter((d: any) => d.status === 'scheduled' || d.status === 'confirmed');
-              setDonations(upcoming.slice(0, 3));
-            }
-            if (!cancelled) {
-              setRequestStatuses(statusesResult.statuses);
-            }
-          } catch (e) {
-            console.error('[iDonate:Home] Donations error', e);
-          }
+            const result = await getDonorRequestStatuses(user.id);
+            if (!cancelled) setRequestStatuses(result.statuses);
+          } catch (e) { console.error('[iDonate:Home] Statuses error', e); }
         })();
-
-        // Fetch nearby centers
         const nearbyPromise = (async () => {
           try {
             const { status } = await Location.requestForegroundPermissionsAsync();
@@ -114,780 +103,312 @@ export default function HomeScreen() {
             ]);
             if (!cancelled) {
               if (!countResult.error) setNearbyCenters({ count: countResult.count, radiusKm: countResult.radiusKm });
-              if (listResult.data) setNearbyInstitutions(listResult.data.slice(0, 5));
+              if (listResult.data) setNearbyInstitutions(listResult.data.slice(0, 3));
             }
-          } catch (e) {
-            console.error('[iDonate:Home] Nearby centers error', e);
-          }
+          } catch (e) { console.error('[iDonate:Home] Nearby error', e); }
         })();
-
-        await Promise.all([bloodTypePromise, requestsPromise, donationsPromise, nearbyPromise]);
+        await Promise.all([bloodTypePromise, requestsPromise, statusesPromise, nearbyPromise]);
         if (!cancelled) setLoading(false);
       }
-
       fetchData();
       return () => { cancelled = true; };
     }, [user?.id])
   );
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.contentContainer}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerTopRow}>
-            <View style={styles.logoContainer}>
-              <MaterialIcons
-                name="favorite"
-                size={24}
-                color="#E74C3C"
-                style={styles.heartIcon}
-              />
-              <ThemedText type="logo" style={styles.logoText}>
-                iDonate
-              </ThemedText>
-            </View>
 
-            <TouchableOpacity
-              style={styles.notificationButton}
-              onPress={() => router.push("/notifications")}
-            >
-              <MaterialIcons name="notifications-none" size={28} color="#2C3E50" />
+  const HIDDEN_STATUSES = new Set(['completed', 'cancelled', 'no_show']);
+  const visibleRequests = requests.filter(r => !HIDDEN_STATUSES.has(requestStatuses.get(r.id) as string));
+  const urgencyColors: Record<string, string> = { critical: '#DC2626', high: '#EA580C', moderate: '#F59E0B', low: '#16A34A' };
+
+  return (
+    <SafeAreaView style={s.safe}>
+      <ScrollView style={s.scroll} contentContainerStyle={s.content}>
+
+        {/* ── Header ── */}
+        <View style={s.header}>
+          <View style={s.headerRow}>
+            <View style={s.logoRow}>
+              <MaterialIcons name="favorite" size={26} color="#E74C3C" />
+              <ThemedText style={s.logoText}>iDonate</ThemedText>
+            </View>
+            <TouchableOpacity style={s.bellBtn} onPress={() => router.push("/notifications")}>
+              <MaterialIcons name="notifications-none" size={26} color="#1E293B" />
               {newCount > 0 && (
-                <View style={styles.notificationBadge}>
-                  <ThemedText style={styles.badgeText}>{newCount}</ThemedText>
-                </View>
+                <View style={s.badge}><ThemedText style={s.badgeText}>{newCount}</ThemedText></View>
               )}
             </TouchableOpacity>
           </View>
-          <ThemedText style={styles.tagline}>
-            Care. Connect. Save lives.
+          <ThemedText style={s.tagline}>
+            Care. Connect. <ThemedText style={s.taglineAccent}>Save lives.</ThemedText>
           </ThemedText>
+        </View>
 
-          <TouchableOpacity
-            style={styles.searchBox}
-            onPress={() => router.push("/search")}
-          >
-            <MaterialIcons
-              name="search"
-              size={20}
-              color="#7F8C8D"
-              style={styles.searchIcon}
-            />
-            <ThemedText style={styles.searchPlaceholder}>
-              Search hospitals, blood banks, requests
+        {/* ── What would you like to do? ── */}
+        <View style={s.actionSection}>
+          <ThemedText style={s.sectionTitle}>What would you like to do?</ThemedText>
+          <View style={s.actionCards}>
+            <TouchableOpacity style={s.donateCardWrap} activeOpacity={0.85} onPress={() => router.push("/donate-blood")}>
+              <LinearGradient colors={['#EF4444', '#DC2626']} style={s.donateCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                <View style={s.donateIconCircle}>
+                  <MaterialIcons name="water-drop" size={28} color="#FFFFFF" />
+                </View>
+                <ThemedText style={s.donateTitle}>Donate Blood</ThemedText>
+                <ThemedText style={s.donateSubtitle}>Help someone in need</ThemedText>
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.requestCardWrap} activeOpacity={0.85} onPress={() => router.push("/request-blood")}>
+              <View style={s.requestCard}>
+                <View style={s.requestIconCircle}>
+                  <Ionicons name="hand-left" size={26} color="#3B82F6" />
+                </View>
+                <ThemedText style={s.requestTitle}>Request Blood</ThemedText>
+                <ThemedText style={s.requestSubtitle}>Get help from donors</ThemedText>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* ── Summary Pills ── */}
+        <View style={s.pills}>
+          <TouchableOpacity style={s.pill} onPress={() => router.navigate("/(tabs)/map")}>
+            <MaterialIcons name="location-on" size={18} color="#DC2626" />
+            <ThemedText style={s.pillLabel}>Nearby</ThemedText>
+            <ThemedText style={s.pillValue}>
+              {loading ? '…' : nearbyCenters ? `${nearbyCenters.count}` : '—'}
             </ThemedText>
+            <ThemedText style={s.pillSub}>centers</ThemedText>
+            <ThemedText style={s.pillLink}>View all ›</ThemedText>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={s.pill} onPress={() => router.push("/donate-blood")}>
+            <MaterialIcons name="water-drop" size={18} color="#DC2626" />
+            <ThemedText style={s.pillLabel}>Your blood type</ThemedText>
+            <ThemedText style={s.pillValue}>{loading ? '…' : bloodType ?? '—'}</ThemedText>
+            <ThemedText style={s.pillSub}> </ThemedText>
+            <ThemedText style={[s.pillLink, { color: '#DC2626' }]}>Edit ›</ThemedText>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={s.pill} onPress={() => router.navigate("/(tabs)/profile")}>
+            <MaterialIcons name={isEligible ? "check-circle" : "hourglass-empty"} size={18} color={isEligible ? '#16A34A' : '#D97706'} />
+            <ThemedText style={s.pillLabel}>Eligible to donate</ThemedText>
+            <ThemedText style={s.pillValue}>{loading ? '…' : isEligible ? 'Yes' : 'No'}</ThemedText>
+            <ThemedText style={s.pillSub}> </ThemedText>
+            <ThemedText style={[s.pillLink, { color: '#16A34A' }]}>Learn more ›</ThemedText>
           </TouchableOpacity>
         </View>
 
-        {/* Donate or Request Section */}
-        <Card style={styles.donateRequestCard}>
-          <View style={styles.cardContent}>
-            <ThemedText style={styles.sectionTitle}>
-              Donate or Request
-            </ThemedText>
-            <ThemedText style={styles.sectionSubtitle}>
-              Fast matching by blood type and location.
-            </ThemedText>
-            <View style={styles.buttonsRow}>
-              <Button
-                style={styles.donateButton}
-                onPress={() => router.push("/donate-blood")}
-              >
-                Donate Blood
-              </Button>
-              <Button
-                variant="secondary"
-                style={styles.requestButton}
-                onPress={() => router.push("/request-blood")}
-              >
-                Request Blood
-              </Button>
-            </View>
-          </View>
-          <View style={styles.bloodCellImage}>
-            <MaterialIcons
-              name="water-drop"
-              size={40}
-              color="#E74C3C"
-              style={styles.bloodCellIcon}
-            />
-          </View>
-        </Card>
-
-        {/* Summary Cards */}
-        <View style={styles.summaryCards}>
-          <View style={styles.summaryCard}>
-            <ThemedText style={styles.summaryLabel}>Nearby centers</ThemedText>
-            <View style={styles.summaryContent}>
-              <MaterialIcons
-                name="location-on"
-                size={20}
-                color="#7F8C8D"
-                style={styles.summaryIcon}
-              />
-              {loading ? (
-                <ActivityIndicator size="small" color="#7F8C8D" />
-              ) : (
-                <ThemedText style={styles.summaryText}>
-                  {nearbyCenters
-                    ? `${nearbyCenters.count} within ${nearbyCenters.radiusKm}km`
-                    : "—"}
-                </ThemedText>
-              )}
-            </View>
-          </View>
-          <View style={styles.summaryCard}>
-            <ThemedText style={styles.summaryLabel}>Your blood type</ThemedText>
-            <View style={styles.summaryContent}>
-              <MaterialIcons
-                name="water-drop"
-                size={20}
-                color="#E74C3C"
-                style={styles.summaryIcon}
-              />
-              {loading ? (
-                <ActivityIndicator size="small" color="#E74C3C" />
-              ) : (
-                <ThemedText style={styles.summaryText}>
-                  {bloodType ?? "Not set"}
-                </ThemedText>
-              )}
-            </View>
-          </View>
-        </View>
-
-        {/* Active Blood Requests */}
-        <View style={styles.sectionHeader}>
-          <ThemedText style={styles.sectionTitle}>Blood requests</ThemedText>
-          <TouchableOpacity
-            style={styles.requestsButton}
-            onPress={() => router.navigate("/(tabs)/requests")}
-          >
-            <ThemedText style={styles.requestsButtonText}>View all</ThemedText>
+        {/* ── Active Blood Requests ── */}
+        <View style={s.sectionHeader}>
+          <ThemedText style={s.sectionTitle}>Active Blood Requests</ThemedText>
+          <TouchableOpacity onPress={() => router.navigate("/(tabs)/requests")}>
+            <ThemedText style={s.viewAll}>View all</ThemedText>
           </TouchableOpacity>
         </View>
 
-        {(() => {
-          const HIDDEN_STATUSES = new Set(['completed', 'cancelled', 'no_show']);
-          const visibleRequests = requests.filter(r => !HIDDEN_STATUSES.has(requestStatuses.get(r.id) as string));
-          return loading ? (
-          <ActivityIndicator size="small" color="#E74C3C" style={{ marginBottom: 16 }} />
+        {loading ? (
+          <ActivityIndicator size="small" color="#DC2626" style={{ marginBottom: 16 }} />
         ) : visibleRequests.length === 0 ? (
-          <View style={styles.requestCard}>
-            <ThemedText style={{ color: '#7F8C8D', textAlign: 'center', padding: 8 }}>
-              No active requests right now
-            </ThemedText>
+          <View style={s.emptyCard}>
+            <ThemedText style={s.emptyText}>No active requests right now</ThemedText>
           </View>
         ) : (
-          <>
-            {visibleRequests.map((req: any) => {
-              const urgencyColors: Record<string, string> = {
-                critical: '#E74C3C', high: '#E67E22', moderate: '#F1C40F', low: '#27AE60',
-              };
-              const timeAgo = getTimeAgo(req.created_at);
-              const isOwnRequest = user?.id === req.requester_id;
-              const requesterName = isOwnRequest ? 'You' : (req.institution_name || req.profiles?.full_name || 'Unknown');
-              const donationStatus = requestStatuses.get(req.id);
-              const statusCfg = donationStatus ? STATUS_CONFIG[donationStatus] : null;
-              return (
-                <TouchableOpacity
-                  key={req.id}
-                  style={[styles.requestCard, statusCfg && { backgroundColor: statusCfg.cardBg, borderWidth: 1.5, borderColor: statusCfg.borderColor }]}
-                  activeOpacity={0.7}
-                  onPress={() => router.push({ pathname: '/blood-request/[id]', params: { id: req.id } } as any)}
-                >
-                  <View style={styles.requestRow}>
-                    <View style={[styles.avatar, { backgroundColor: statusCfg ? statusCfg.color : (urgencyColors[req.urgency_level] || '#E74C3C') }]}>
-                      {donationStatus === 'completed' ? (
-                        <MaterialIcons name="check" size={20} color="#FFF" />
-                      ) : donationStatus === 'cancelled' ? (
-                        <MaterialIcons name="close" size={20} color="#FFF" />
-                      ) : (
-                        <ThemedText style={{ color: '#FFF', fontWeight: 'bold', fontSize: 14 }}>
-                          {req.blood_type_needed}
-                        </ThemedText>
-                      )}
-                    </View>
-                    <View style={styles.requestContent}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <ThemedText style={styles.requestTitle} numberOfLines={1}>
-                          {requesterName}
-                        </ThemedText>
-                        {isOwnRequest && (
-                          <View style={styles.ownRequestBadge}>
-                            <ThemedText style={styles.ownRequestBadgeText}>Your Request</ThemedText>
-                          </View>
-                        )}
-                        {statusCfg && (
-                          <View style={[styles.statusMiniTag, { backgroundColor: statusCfg.bg }]}>
-                            <ThemedText style={[styles.statusMiniTagText, { color: statusCfg.color }]}>{statusCfg.label}</ThemedText>
-                          </View>
-                        )}
+          visibleRequests.slice(0, 2).map((req: any) => {
+            const timeAgo = getTimeAgo(req.created_at);
+            const isOwn = user?.id === req.requester_id;
+            const name = isOwn ? 'You' : (req.institution_name || req.profiles?.full_name || 'Unknown');
+            const donationStatus = requestStatuses.get(req.id);
+            const statusCfg = donationStatus ? STATUS_CONFIG[donationStatus] : null;
+            const urgColor = urgencyColors[req.urgency_level] || '#DC2626';
+            return (
+              <TouchableOpacity key={req.id} style={[s.reqCard, statusCfg && { backgroundColor: statusCfg.cardBg, borderWidth: 1.5, borderColor: statusCfg.borderColor }]} activeOpacity={0.7}
+                onPress={() => router.push({ pathname: '/blood-request/[id]', params: { id: req.id } } as any)}>
+                <View style={[s.reqAvatar, { backgroundColor: statusCfg ? statusCfg.color : urgColor }]}>
+                  <ThemedText style={s.reqAvatarText}>{req.blood_type_needed}</ThemedText>
+                </View>
+                <View style={s.reqContent}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <ThemedText style={s.reqName} numberOfLines={1}>{name}</ThemedText>
+                    {statusCfg && (
+                      <View style={[s.miniTag, { backgroundColor: statusCfg.bg }]}>
+                        <ThemedText style={[s.miniTagText, { color: statusCfg.color }]}>{statusCfg.label}</ThemedText>
                       </View>
-                      <ThemedText style={styles.requestSubtitle}>
-                        {req.blood_type_needed} · {req.units_needed} unit{req.units_needed > 1 ? 's' : ''} · {timeAgo}
-                      </ThemedText>
-                      {req.description ? (
-                        <ThemedText style={{ fontSize: 12, color: '#95A5A6', marginTop: 2 }} numberOfLines={1}>
-                          {req.description}
-                        </ThemedText>
-                      ) : req.date_needed ? (
-                        <ThemedText style={{ fontSize: 12, color: '#95A5A6', marginTop: 2 }}>
-                          Needed by {new Date(req.date_needed).toLocaleDateString()}
-                        </ThemedText>
-                      ) : null}
-                    </View>
-                    <View style={[styles.matchingStatus, { backgroundColor: statusCfg ? statusCfg.bg : urgencyColors[req.urgency_level] + '20' }]}>
-                      <ThemedText style={[styles.statusText, { color: statusCfg ? statusCfg.color : urgencyColors[req.urgency_level] }]}>
-                        {statusCfg ? statusCfg.label.toLowerCase() : req.urgency_level}
-                      </ThemedText>
-                    </View>
+                    )}
                   </View>
-                </TouchableOpacity>
-              );
-            })}
-          </>
-        );
-        })()}
-
-        {/* Nearby Donation Centers */}
-        <View style={styles.mapSection}>
-          <View style={styles.mapHeader}>
-            <ThemedText style={styles.sectionTitle}>
-              Nearby donation centers
-            </ThemedText>
-          </View>
-
-          {loading ? (
-            <ActivityIndicator size="small" color="#7F8C8D" style={{ marginVertical: 20 }} />
-          ) : nearbyInstitutions.length === 0 ? (
-            <View style={styles.mapPlaceholder}>
-              <MaterialIcons name="location-off" size={32} color="#BDC3C7" />
-              <ThemedText style={[styles.mapText, { marginTop: 8 }]}>No institutions found nearby</ThemedText>
-            </View>
-          ) : (
-            nearbyInstitutions.map((inst: any) => (
-              <TouchableOpacity
-                key={inst.id}
-                style={styles.institutionCard}
-                onPress={() => { /* TODO: navigate to institution detail */ }}
-              >
-                <View style={styles.institutionIconWrap}>
-                  <MaterialIcons
-                    name={inst.institution_type === 'blood_bank' ? 'water-drop' : 'local-hospital'}
-                    size={24}
-                    color={inst.institution_type === 'blood_bank' ? '#E74C3C' : '#4A90E2'}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <ThemedText style={styles.institutionName}>{inst.institution_name}</ThemedText>
-                  <ThemedText style={styles.institutionDetail}>
-                    {inst.address || 'No address'} · {inst.distance} km away
+                  <ThemedText style={s.reqMeta}>
+                    {req.blood_type_needed} · {req.units_needed} unit{req.units_needed > 1 ? 's' : ''} · {timeAgo}
                   </ThemedText>
+                  {req.description && <ThemedText style={s.reqDesc} numberOfLines={1}>{req.description}</ThemedText>}
                 </View>
-                <View style={styles.institutionTypeBadge}>
-                  <ThemedText style={styles.institutionTypeText}>
-                    {inst.institution_type === 'blood_bank' ? 'Blood Bank' : 'Hospital'}
+                <View style={[s.urgencyBadge, { backgroundColor: statusCfg ? statusCfg.bg : urgColor + '18' }]}>
+                  <ThemedText style={[s.urgencyText, { color: statusCfg ? statusCfg.color : urgColor }]}>
+                    {statusCfg ? statusCfg.label : req.urgency_level?.charAt(0).toUpperCase() + req.urgency_level?.slice(1)}
                   </ThemedText>
                 </View>
               </TouchableOpacity>
-            ))
-          )}
+            );
+          })
+        )}
 
-          <View style={styles.liveIndicator}>
-            <View style={styles.liveDot} />
-            <ThemedText style={styles.liveText}>
-              Live availability updates
-            </ThemedText>
-          </View>
+        {/* ── Find Donation Centers ── */}
+        <View style={s.sectionHeader}>
+          <ThemedText style={s.sectionTitle}>Find Donation Centers</ThemedText>
+          <TouchableOpacity onPress={() => router.navigate("/(tabs)/map")}>
+            <ThemedText style={s.viewAll}>View all</ThemedText>
+          </TouchableOpacity>
         </View>
 
-        {/* Blood Compatibility */}
-        <ThemedText style={styles.sectionTitle}>Blood compatibility</ThemedText>
-        <View style={styles.compatibilityGrid}>
-          {[
-            { type: "O-", compatibility: "Donate to All" },
-            { type: "O+", compatibility: "Donate to O+, A+, B+, AB+" },
-            { type: "A-", compatibility: "To A-, A+, AB-, AB+" },
-            { type: "A+", compatibility: "To A+, AB+" },
-            { type: "B-", compatibility: "To B-, B+, AB-, AB+" },
-            { type: "B+", compatibility: "To B+, AB+" },
-            { type: "AB-", compatibility: "To AB-, AB+" },
-            { type: "AB+", compatibility: "Receive from All" },
-          ].map((item) => (
-            <View key={item.type} style={styles.compatibilityCard}>
-              <ThemedText style={styles.bloodType}>{item.type}</ThemedText>
-              <ThemedText style={styles.compatibilityText}>
-                {item.compatibility}
-              </ThemedText>
+        {loading ? (
+          <ActivityIndicator size="small" color="#7F8C8D" style={{ marginVertical: 16 }} />
+        ) : nearbyInstitutions.length === 0 ? (
+          <View style={s.emptyCard}>
+            <MaterialIcons name="location-off" size={28} color="#BDC3C7" />
+            <ThemedText style={s.emptyText}>No centers found nearby</ThemedText>
+          </View>
+        ) : (
+          nearbyInstitutions.map((inst: any) => (
+            <View key={inst.id} style={s.centerCard}>
+              <View style={s.centerIcon}>
+                <MaterialIcons
+                  name={inst.institution_type === 'blood_bank' ? 'water-drop' : 'local-hospital'}
+                  size={22}
+                  color={inst.institution_type === 'blood_bank' ? '#DC2626' : '#3B82F6'}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ThemedText style={s.centerName}>{inst.institution_name}</ThemedText>
+                <ThemedText style={s.centerMeta}>{inst.address || 'No address'} · {inst.distance} km away</ThemedText>
+              </View>
+              <TouchableOpacity
+                style={s.navBtn}
+                onPress={() => {
+                  const url = Platform.select({
+                    ios: `maps:0,0?q=${inst.latitude},${inst.longitude}`,
+                    default: `geo:${inst.latitude},${inst.longitude}?q=${inst.latitude},${inst.longitude}(${inst.institution_name})`,
+                  });
+                  if (url) Linking.openURL(url);
+                }}
+              >
+                <MaterialIcons name="navigation" size={20} color="#DC2626" />
+              </TouchableOpacity>
+            </View>
+          ))
+        )}
+
+        {/* ── Blood Compatibility ── */}
+        <View style={s.sectionHeader}>
+          <ThemedText style={s.sectionTitle}>Blood Compatibility</ThemedText>
+          <TouchableOpacity onPress={() => Linking.openURL('https://www.redcrossblood.org/donate-blood/blood-types.html')}>
+            <ThemedText style={s.viewAll}>See guide</ThemedText>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.compatRow}>
+          {BLOOD_COMPAT.slice(0, 3).map((item) => (
+            <View key={item.type} style={s.compatCard}>
+              <MaterialIcons name="water-drop" size={18} color={item.color} />
+              <ThemedText style={s.compatType}>{item.type}</ThemedText>
+              <ThemedText style={s.compatInfo}>{item.info}</ThemedText>
             </View>
           ))}
-        </View>
+          <TouchableOpacity style={s.compatMore} onPress={() => Linking.openURL('https://www.redcrossblood.org/donate-blood/blood-types.html')}>
+            <ThemedText style={s.compatMoreCount}>+5 more</ThemedText>
+            <ThemedText style={s.compatMoreLink}>View all</ThemedText>
+          </TouchableOpacity>
+        </ScrollView>
 
-        {/* Bottom spacer for tab bar */}
-        <View style={styles.bottomSpacer} />
+        {/* ── Motivational Banner ── */}
+        <TouchableOpacity style={s.motiveBanner} activeOpacity={0.8} onPress={() => router.push("/donate-blood")}>
+          <MaterialIcons name="favorite" size={22} color="#DC2626" />
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <ThemedText style={s.motiveTitle}>Every drop counts.</ThemedText>
+            <ThemedText style={s.motiveSub}>Your donation can save up to 3 lives.</ThemedText>
+          </View>
+          <MaterialIcons name="chevron-right" size={24} color="#94A3B8" />
+        </TouchableOpacity>
+
+        <View style={{ height: 24 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#F8F4F4",
-  },
-  container: {
-    flex: 1,
-    backgroundColor: "#F8F4F4",
-  },
-  contentContainer: {
-    padding: 16,
-    paddingBottom: 100, // Space for tab bar
-  },
+const s = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: '#F8FAFC' },
+  scroll: { flex: 1 },
+  content: { paddingHorizontal: 20, paddingBottom: 100 },
 
-  // Header styles
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 24,
-    backgroundColor: "#F8F4F4",
-  },
-  headerTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  logoContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  heartIcon: {
-    marginRight: 8,
-  },
-  logoText: {
-    fontSize: 28,
-    lineHeight: 34,
-    fontWeight: "bold",
-    color: "#2C3E50",
-  },
-  notificationButton: {
-    position: 'relative',
-    padding: 4,
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    backgroundColor: '#E74C3C',
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#F8F4F4',
-  },
-  badgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  tagline: {
-    fontSize: 14,
-    color: "#7F8C8D",
-    marginBottom: 16,
-  },
-  searchBox: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    width: "100%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: "#E8E8E8",
-  },
-  searchIcon: {
-    marginRight: 12,
-  },
-  searchPlaceholder: {
-    flex: 1,
-    fontSize: 16,
-    color: "#7F8C8D",
-  },
-  searchActionIcon: {
-    fontSize: 18,
-    color: "#7F8C8D",
-    marginLeft: 8,
-  },
+  // Header
+  header: { paddingTop: 12, marginBottom: 20 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  logoText: { fontSize: 26, fontWeight: '800', color: '#1E293B' },
+  bellBtn: { position: 'relative', padding: 4 },
+  badge: { position: 'absolute', top: 0, right: 0, backgroundColor: '#DC2626', borderRadius: 10, minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#F8FAFC' },
+  badgeText: { color: '#FFF', fontSize: 10, fontWeight: 'bold' },
+  tagline: { fontSize: 14, color: '#94A3B8', marginTop: 2 },
+  taglineAccent: { color: '#DC2626', fontWeight: '600' },
 
-  // Donate/Request section
-  donateRequestCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  cardContent: {
-    flex: 1,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#2C3E50",
-  },
-  requestsButton: {
-    backgroundColor: "#4A90E2",
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  requestsButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#FFFFFF",
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    color: "#7F8C8D",
-    marginBottom: 16,
-  },
-  buttonsRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  donateButton: {
-    backgroundColor: "#E74C3C",
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    flex: 1,
-  },
-  donateButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  requestButton: {
-    backgroundColor: "#E8F4FD",
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    flex: 1,
-  },
-  requestButtonText: {
-    color: "#2C3E50",
-    fontSize: 14,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  bloodCellImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    backgroundColor: "#F8F4F4",
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 16,
-  },
-  bloodCellIcon: {
-    // Icon styling handled by MaterialIcons component
-  },
+  // Action cards
+  actionSection: { marginBottom: 20 },
+  sectionTitle: { fontSize: 17, fontWeight: '700', color: '#1E293B', marginBottom: 14 },
+  actionCards: { flexDirection: 'row', gap: 12 },
+  donateCardWrap: { flex: 1.15 },
+  donateCard: { borderRadius: 20, padding: 20, height: 150, justifyContent: 'flex-end' },
+  donateIconCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.25)', justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
+  donateTitle: { fontSize: 17, fontWeight: '800', color: '#FFFFFF', marginBottom: 2 },
+  donateSubtitle: { fontSize: 12, color: 'rgba(255,255,255,0.85)' },
+  requestCardWrap: { flex: 1 },
+  requestCard: { borderRadius: 20, padding: 20, height: 150, justifyContent: 'flex-end', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  requestIconCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
+  requestTitle: { fontSize: 17, fontWeight: '800', color: '#1E293B', marginBottom: 2 },
+  requestSubtitle: { fontSize: 12, color: '#94A3B8' },
 
-  // Summary cards
-  summaryCards: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 24,
-  },
-  summaryCard: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  summaryLabel: {
-    fontSize: 12,
-    color: "#7F8C8D",
-    marginBottom: 8,
-  },
-  summaryContent: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  summaryIcon: {
-    marginRight: 8,
-  },
-  summaryText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#2C3E50",
-  },
+  // Pills
+  pills: { flexDirection: 'row', gap: 10, marginBottom: 24 },
+  pill: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2, borderWidth: 1, borderColor: '#F1F5F9' },
+  pillLabel: { fontSize: 11, color: '#94A3B8', marginTop: 6, textAlign: 'center' },
+  pillValue: { fontSize: 22, fontWeight: '800', color: '#1E293B', marginTop: 2 },
+  pillSub: { fontSize: 11, color: '#94A3B8' },
+  pillLink: { fontSize: 11, fontWeight: '600', color: '#3B82F6', marginTop: 4 },
 
-  // Requests section
-  requestCard: {
-    backgroundColor: "#E8F4FD",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  requestRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#F8F4F4",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  avatarIcon: {
-    // Icon styling handled by MaterialIcons component
-  },
-  requestContent: {
-    flex: 1,
-  },
-  requestTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#2C3E50",
-    marginBottom: 4,
-  },
-  ownRequestBadge: {
-    backgroundColor: '#EBF5FF',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#93C5FD',
-    marginBottom: 4,
-  },
-  ownRequestBadgeText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#2563EB',
-    textTransform: 'uppercase',
-  },
-  requestSubtitle: {
-    fontSize: 14,
-    color: "#7F8C8D",
-  },
-  matchingStatus: {
-    backgroundColor: "#FFE5E5",
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  scheduledStatus: {
-    backgroundColor: "#E8F4FD",
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#E74C3C",
-  },
+  // Section header
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  viewAll: { fontSize: 14, fontWeight: '600', color: '#DC2626' },
 
-  // Map section
-  mapSection: {
-    marginBottom: 24,
-  },
-  mapHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  filterButton: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  filterIcon: {
-    marginRight: 4,
-  },
-  filterText: {
-    fontSize: 14,
-    color: "#2C3E50",
-    fontWeight: "500",
-  },
-  mapPlaceholder: {
-    height: 200,
-    backgroundColor: "#E8F4FD",
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  mapText: {
-    fontSize: 16,
-    color: "#7F8C8D",
-  },
-  mapButtons: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 12,
-  },
-  mapButton: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  mapButtonIcon: {
-    marginBottom: 4,
-  },
-  mapButtonText: {
-    fontSize: 12,
-    color: "#2C3E50",
-    fontWeight: "500",
-  },
-  liveIndicator: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#E74C3C",
-    marginRight: 8,
-  },
-  liveText: {
-    fontSize: 12,
-    color: "#7F8C8D",
-  },
+  // Request cards
+  reqCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2, borderWidth: 1, borderColor: '#F1F5F9' },
+  reqAvatar: { width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  reqAvatarText: { color: '#FFF', fontWeight: '800', fontSize: 13 },
+  reqContent: { flex: 1 },
+  reqName: { fontSize: 15, fontWeight: '700', color: '#1E293B', marginBottom: 2 },
+  reqMeta: { fontSize: 12, color: '#94A3B8' },
+  reqDesc: { fontSize: 11, color: '#94A3B8', marginTop: 2 },
+  miniTag: { borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
+  miniTagText: { fontSize: 10, fontWeight: '700' },
+  urgencyBadge: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5, marginLeft: 8 },
+  urgencyText: { fontSize: 11, fontWeight: '700' },
 
-  // Institution cards
-  institutionCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  institutionIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#F0F4F8",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  institutionName: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#2C3E50",
-    marginBottom: 2,
-  },
-  institutionDetail: {
-    fontSize: 12,
-    color: "#7F8C8D",
-  },
-  institutionTypeBadge: {
-    backgroundColor: "#F0F4F8",
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginLeft: 8,
-  },
-  institutionTypeText: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: "#4A90E2",
-  },
+  // Empty
+  emptyCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 24, alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#F1F5F9' },
+  emptyText: { color: '#94A3B8', fontSize: 14, marginTop: 4 },
 
-  // Blood compatibility
-  compatibilityGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-    justifyContent: "space-between",
-  },
-  compatibilityCard: {
-    width: "48%",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  bloodType: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#2C3E50",
-    marginBottom: 8,
-  },
-  compatibilityText: {
-    fontSize: 12,
-    color: "#7F8C8D",
-    textAlign: "center",
-    lineHeight: 16,
-  },
+  // Center cards
+  centerCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2, borderWidth: 1, borderColor: '#F1F5F9' },
+  centerIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  centerName: { fontSize: 15, fontWeight: '600', color: '#1E293B', marginBottom: 2 },
+  centerMeta: { fontSize: 12, color: '#94A3B8' },
+  navBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FEF2F2', justifyContent: 'center', alignItems: 'center', marginLeft: 8 },
 
-  // Bottom spacer
-  bottomSpacer: {
-    height: 20,
-  },
+  // Compatibility
+  compatRow: { paddingBottom: 4, gap: 10, marginBottom: 20 },
+  compatCard: { width: 120, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: '#F1F5F9', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
+  compatType: { fontSize: 18, fontWeight: '800', color: '#1E293B', marginTop: 6 },
+  compatInfo: { fontSize: 10, color: '#94A3B8', textAlign: 'center', marginTop: 4 },
+  compatMore: { width: 100, backgroundColor: '#F8FAFC', borderRadius: 16, padding: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
+  compatMoreCount: { fontSize: 16, fontWeight: '700', color: '#64748B' },
+  compatMoreLink: { fontSize: 12, color: '#DC2626', fontWeight: '600', marginTop: 4 },
 
-  // Donation status indicators
-  statusMiniTag: {
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  statusMiniTagText: {
-    fontSize: 10,
-    fontWeight: "700",
-  },
+  // Motivational
+  motiveBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF1F2', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#FECDD3' },
+  motiveTitle: { fontSize: 14, fontWeight: '700', color: '#DC2626' },
+  motiveSub: { fontSize: 12, color: '#94A3B8', marginTop: 1 },
 });
