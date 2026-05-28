@@ -159,8 +159,13 @@ export function getCooldownStatus(donor: DonorProfile | null): {
             const daysRemaining = Math.ceil(
                 (eligibleDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
             );
+            console.log('[iDonate:Cooldown] PATH=next_eligible_date', {
+                next_eligible_date: donor.next_eligible_date,
+                daysRemaining,
+            });
             return { isEligible: false, nextEligibleDate: eligibleDate, daysRemaining };
         }
+        console.log('[iDonate:Cooldown] next_eligible_date passed → eligible');
     }
     // Fallback to last_donation_date
     else if (donor.last_donation_date) {
@@ -170,12 +175,20 @@ export function getCooldownStatus(donor: DonorProfile | null): {
         );
         if (daysSince < ELIGIBILITY_COOLDOWN_DAYS) {
             const nextEligibleDate = new Date(lastDonation.getTime() + ELIGIBILITY_COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
+            console.log('[iDonate:Cooldown] PATH=last_donation_date fallback', {
+                last_donation_date: donor.last_donation_date,
+                daysSince,
+                daysRemaining: ELIGIBILITY_COOLDOWN_DAYS - daysSince,
+            });
             return {
                 isEligible: false,
                 nextEligibleDate,
                 daysRemaining: ELIGIBILITY_COOLDOWN_DAYS - daysSince,
             };
         }
+        console.log('[iDonate:Cooldown] last_donation_date cooldown passed → eligible');
+    } else {
+        console.log('[iDonate:Cooldown] No cooldown dates → eligible');
     }
 
     return { isEligible: true, nextEligibleDate: null, daysRemaining: 0 };

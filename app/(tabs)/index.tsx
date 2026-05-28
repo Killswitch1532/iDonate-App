@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
+import Svg, { Circle } from "react-native-svg";
 
 import { ThemedText } from "@/components/themed-text";
 import { useAuth } from "@/contexts/AuthContext";
@@ -63,8 +64,11 @@ export default function HomeScreen() {
   const [nearbyInstitutions, setNearbyInstitutions] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [requestStatuses, setRequestStatuses] = useState<Map<string, DonationStatus>>(new Map());
-  const [isEligible, setIsEligible] = useState(true);
+  const [cooldownInfo, setCooldownInfo] = useState<{ isEligible: boolean; nextEligibleDate: Date | null; daysRemaining: number }>({ isEligible: true, nextEligibleDate: null, daysRemaining: 0 });
   const [loading, setLoading] = useState(true);
+
+  // Progress fraction for the ring (0 = just donated, 1 = eligible)
+  const cooldownProgress = cooldownInfo.isEligible ? 1 : Math.max(0, 1 - (cooldownInfo.daysRemaining / 90));
 
   useFocusEffect(
     useCallback(() => {
@@ -76,7 +80,7 @@ export default function HomeScreen() {
           const { data } = await getDonorProfile(user.id);
           if (!cancelled && data) {
             if (data.blood_type) setBloodType(data.blood_type);
-            setIsEligible(getCooldownStatus(data).isEligible);
+            setCooldownInfo(getCooldownStatus(data));
           }
         })();
         const requestsPromise = (async () => {
@@ -188,11 +192,43 @@ export default function HomeScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity style={s.pill} onPress={() => router.navigate("/(tabs)/profile")}>
-            <MaterialIcons name={isEligible ? "check-circle" : "hourglass-empty"} size={18} color={isEligible ? '#16A34A' : '#D97706'} />
-            <ThemedText style={s.pillLabel}>Eligible to donate</ThemedText>
-            <ThemedText style={s.pillValue}>{loading ? '…' : isEligible ? 'Yes' : 'No'}</ThemedText>
-            <ThemedText style={s.pillSub}> </ThemedText>
-            <ThemedText style={[s.pillLink, { color: '#16A34A' }]}>Learn more ›</ThemedText>
+            {loading ? (
+              <ActivityIndicator size="small" color="#94A3B8" />
+            ) : cooldownInfo.isEligible ? (
+              <>
+                <MaterialIcons name="check-circle" size={22} color="#16A34A" />
+                <ThemedText style={s.pillLabel}>Eligible to donate</ThemedText>
+                <ThemedText style={[s.pillValue, { color: '#16A34A' }]}>Yes</ThemedText>
+                <ThemedText style={s.pillSub}> </ThemedText>
+                <ThemedText style={[s.pillLink, { color: '#16A34A' }]}>Learn more ›</ThemedText>
+              </>
+            ) : (
+              <>
+                {/* SVG ring countdown */}
+                <View style={{ width: 50, height: 50, alignItems: 'center', justifyContent: 'center' }}>
+                  <View style={{ transform: [{ rotate: '-90deg' }] }}>
+                    <Svg width={50} height={50}>
+                      <Circle cx={25} cy={25} r={20.25} stroke="#FEF3C7" strokeWidth={4.5} fill="none" />
+                      <Circle
+                        cx={25} cy={25} r={20.25}
+                        stroke="#F59E0B" strokeWidth={4.5} fill="none"
+                        strokeLinecap="round"
+                        strokeDasharray={`${2 * Math.PI * 20.25}`}
+                        strokeDashoffset={`${2 * Math.PI * 20.25 * (1 - cooldownProgress)}`}
+                      />
+                    </Svg>
+                  </View>
+                  <View style={s.ringCenter}>
+                    <ThemedText style={s.ringText}>{cooldownInfo.daysRemaining}</ThemedText>
+                  </View>
+                </View>
+                <ThemedText style={s.pillLabel}>Days left</ThemedText>
+                <ThemedText style={[s.pillValue, { fontSize: 16, color: '#D97706' }]}>
+                  {cooldownInfo.nextEligibleDate?.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                </ThemedText>
+                <ThemedText style={[s.pillLink, { color: '#D97706' }]}>Details ›</ThemedText>
+              </>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -296,7 +332,7 @@ export default function HomeScreen() {
         {/* ── Blood Compatibility ── */}
         <View style={s.sectionHeader}>
           <ThemedText style={s.sectionTitle}>Blood Compatibility</ThemedText>
-          <TouchableOpacity onPress={() => Linking.openURL('https://www.redcrossblood.org/donate-blood/blood-types.html')}>
+          <TouchableOpacity onPress={() => router.push("/compatibility")}>
             <ThemedText style={s.viewAll}>See guide</ThemedText>
           </TouchableOpacity>
         </View>
@@ -369,6 +405,10 @@ const s = StyleSheet.create({
   pillValue: { fontSize: 22, fontWeight: '800', color: '#1E293B', marginTop: 2 },
   pillSub: { fontSize: 11, color: '#94A3B8' },
   pillLink: { fontSize: 11, fontWeight: '600', color: '#3B82F6', marginTop: 4 },
+
+  // Cooldown ring
+  ringCenter: { position: 'absolute', width: 38, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  ringText: { fontSize: 14, fontWeight: '800', color: '#D97706' },
 
   // Section header
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
