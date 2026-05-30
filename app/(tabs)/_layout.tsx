@@ -1,15 +1,24 @@
-import { Tabs } from 'expo-router';
+import { Tabs, useSegments } from 'expo-router';
 import React from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
+import { StatusBar } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const segments = useSegments();
+  const isProfile = segments.includes('profile');
 
   return (
-    <Tabs
+    <>
+      <StatusBar 
+        barStyle={isProfile ? 'light-content' : 'dark-content'} 
+        backgroundColor={isProfile ? '#E74C3C' : 'transparent'} 
+        translucent 
+      />
+      <Tabs
       screenOptions={{
         tabBarActiveTintColor: '#E74C3C',
         tabBarInactiveTintColor: '#9AA4AB',
@@ -82,5 +91,6 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    </>
   );
 }
