@@ -8,7 +8,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const segments = useSegments();
+  const segments = useSegments() as string[];
   const isProfile = segments.includes('profile');
 
   return (

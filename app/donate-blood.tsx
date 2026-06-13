@@ -29,7 +29,7 @@ import { ThemedText } from '@/components/themed-text';
 import { useAuth } from '@/contexts/AuthContext';
 import { getDonorProfile, upsertDonorProfile, getCooldownStatus } from '@/services/donorService';
 import { Institution, getNearbyInstitutions } from '@/services/institutionService';
-import { bookDonation } from '@/services/donationService';
+import { bookDonation, getAvailableSlots } from '@/services/donationService';
 
 export default function DonateBloodScreen() {
   const { user } = useAuth();
@@ -59,6 +59,41 @@ export default function DonateBloodScreen() {
   const [timeChosen, setTimeChosen] = useState<boolean>(false);
   const [booking, setBooking] = useState<boolean>(false);
   const [cooldownStatus, setCooldownStatus] = useState<{ isEligible: boolean; nextEligibleDate: Date | null; daysRemaining: number }>({ isEligible: true, nextEligibleDate: null, daysRemaining: 0 });
+
+  // Slots state
+  const [availableSlots, setAvailableSlots] = useState<any[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState<boolean>(false);
+  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
+
+  const loadSlots = useCallback(async (centerId: string, date: Date) => {
+    setSlotsLoading(true);
+    try {
+      const { data, error } = await getAvailableSlots(centerId, date);
+      if (error) {
+        console.error('[iDonate:DonateBlood] Error loading slots:', error);
+        setAvailableSlots([]);
+      } else {
+        setAvailableSlots(data || []);
+      }
+    } catch (err) {
+      console.error('[iDonate:DonateBlood] Error loading slots:', err);
+      setAvailableSlots([]);
+    } finally {
+      setSlotsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedCenter) {
+      setSelectedSlotId(null);
+      setTimeChosen(false);
+      loadSlots(selectedCenter, selectedDate);
+    } else {
+      setAvailableSlots([]);
+      setSelectedSlotId(null);
+      setTimeChosen(false);
+    }
+  }, [selectedCenter, selectedDate.toDateString(), loadSlots]);
 
   const detectLocation = useCallback(async () => {
     setLocationLoading(true);
@@ -510,27 +545,83 @@ export default function DonateBloodScreen() {
                 <ThemedText style={styles.sectionTitle}>Preferred Date & Time</ThemedText>
               </View>
 
-              <View style={styles.dateTimeRow}>
-                <TouchableOpacity
-                  style={styles.dateTimeButton}
-                  onPress={() => setShowDatePicker(true)}
-                >
-                  <MaterialIcons name="calendar-today" size={20} color="#4A90E2" />
-                  <ThemedText style={dateChosen ? styles.dateTimeValue : styles.dateTimePlaceholder}>
-                    {dateChosen ? selectedDate.toLocaleDateString() : 'Select date'}
-                  </ThemedText>
-                </TouchableOpacity>
+              {!selectedCenter ? (
+                <ThemedText style={styles.emptyText}>Please select a donation center first to choose a date and view available slots.</ThemedText>
+              ) : (
+                <>
+                  <View style={styles.dateTimeRow}>
+                    <TouchableOpacity
+                      style={[styles.dateTimeButton, { flex: 0, width: '100%' }]}
+                      onPress={() => setShowDatePicker(true)}
+                    >
+                      <MaterialIcons name="calendar-today" size={20} color="#4A90E2" />
+                      <ThemedText style={dateChosen ? styles.dateTimeValue : styles.dateTimePlaceholder}>
+                        {dateChosen ? selectedDate.toLocaleDateString() : 'Select date'}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  </View>
 
-                <TouchableOpacity
-                  style={styles.dateTimeButton}
-                  onPress={() => setShowTimePicker(true)}
-                >
-                  <MaterialIcons name="access-time" size={20} color="#4A90E2" />
-                  <ThemedText style={timeChosen ? styles.dateTimeValue : styles.dateTimePlaceholder}>
-                    {timeChosen ? selectedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Select time'}
-                  </ThemedText>
-                </TouchableOpacity>
-              </View>
+                  <ThemedText style={styles.slotsLabel}>Available Slots</ThemedText>
+
+                  {slotsLoading ? (
+                    <View style={{ paddingVertical: 12, alignItems: 'center' }}>
+                      <ActivityIndicator size="small" color="#4A90E2" />
+                    </View>
+                  ) : !dateChosen ? (
+                    <ThemedText style={styles.emptyText}>Choose a date above to check slot availability.</ThemedText>
+                  ) : availableSlots.length === 0 ? (
+                    <ThemedText style={[styles.emptyText, { color: '#C0392B' }]}>
+                      No slots configured or available for this day. Please select another date.
+                    </ThemedText>
+                  ) : (
+                    <View style={styles.slotsContainer}>
+                      {availableSlots.map((slot) => {
+                        const isSelected = selectedSlotId === slot.id;
+                        const isFull = slot.slots_left <= 0;
+                        const startTimeStr = slot.start_time ? slot.start_time.substring(0, 5) : '';
+                        const endTimeStr = slot.end_time ? slot.end_time.substring(0, 5) : '';
+
+                        return (
+                          <TouchableOpacity
+                            key={slot.id}
+                            style={[
+                              styles.slotButton,
+                              isSelected && styles.slotButtonSelected,
+                              isFull && styles.slotButtonDisabled,
+                            ]}
+                            disabled={isFull}
+                            onPress={() => {
+                              setSelectedSlotId(slot.id);
+                              if (slot.start_time) {
+                                const [hours, minutes] = slot.start_time.split(':').map(Number);
+                                setSelectedDate(prev => {
+                                  const updated = new Date(prev);
+                                  updated.setHours(hours, minutes, 0, 0);
+                                  return updated;
+                                });
+                                setTimeChosen(true);
+                              }
+                            }}
+                          >
+                            <ThemedText style={[styles.slotTimeText, isSelected && styles.slotTimeTextSelected]}>
+                              {startTimeStr} - {endTimeStr}
+                            </ThemedText>
+                            <ThemedText
+                              style={[
+                                styles.slotCapacityText,
+                                isSelected && styles.slotCapacityTextSelected,
+                                isFull && styles.slotCapacityTextFull,
+                              ]}
+                            >
+                              {isFull ? 'Fully Booked' : `${slot.slots_left} slot${slot.slots_left !== 1 ? 's' : ''} left`}
+                            </ThemedText>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+                </>
+              )}
 
               {showDatePicker && (
                 <DateTimePicker
@@ -546,25 +637,6 @@ export default function DonateBloodScreen() {
                         return updated;
                       });
                       setDateChosen(true);
-                    }
-                  }}
-                />
-              )}
-
-              {showTimePicker && (
-                <DateTimePicker
-                  value={selectedDate}
-                  mode="time"
-                  is24Hour={false}
-                  onChange={(event: any, date?: Date) => {
-                    setShowTimePicker(false);
-                    if (event.type === 'set' && date) {
-                      setSelectedDate(prev => {
-                        const updated = new Date(prev);
-                        updated.setHours(date.getHours(), date.getMinutes());
-                        return updated;
-                      });
-                      setTimeChosen(true);
                     }
                   }}
                 />
@@ -1040,5 +1112,59 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#92400E',
     marginTop: 4,
+  },
+  slotsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 10,
+  },
+  slotButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    width: '48%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  slotButtonSelected: {
+    borderColor: '#27AE60',
+    backgroundColor: '#F0FFF4',
+  },
+  slotButtonDisabled: {
+    backgroundColor: '#F5F5F5',
+    borderColor: '#E8E8E8',
+    opacity: 0.6,
+  },
+  slotTimeText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#2C3E50',
+  },
+  slotTimeTextSelected: {
+    color: '#27AE60',
+  },
+  slotCapacityText: {
+    fontSize: 12,
+    color: '#7F8C8D',
+    marginTop: 4,
+  },
+  slotCapacityTextSelected: {
+    color: '#27AE60',
+    fontWeight: '500',
+  },
+  slotCapacityTextFull: {
+    color: '#C0392B',
+    fontWeight: '600',
+  },
+  slotsLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2C3E50',
+    marginBottom: 8,
+    marginTop: 12,
   },
 });

@@ -90,7 +90,7 @@ function hexToFloat64(hex: string, littleEndian: boolean): number {
  *   2. GeoJSON object  — { type: 'Point', coordinates: [lng, lat] }
  *   3. WKT string      — "POINT(lng lat)"
  */
-function extractCoords(location: any): { lat: number; lng: number } | null {
+export function extractCoords(location: any): { lat: number; lng: number } | null {
     if (!location) return null;
 
     // 1) WKB hex string (starts with "00" big-endian or "01" little-endian)

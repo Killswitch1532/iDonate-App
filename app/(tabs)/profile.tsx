@@ -9,6 +9,7 @@ import { ThemedText } from "@/components/themed-text";
 import { useAuth } from "@/contexts/AuthContext";
 import { getDonorProfile, DonorProfile, getCooldownStatus } from "@/services/donorService";
 import { getDonorDonations, Donation } from "@/services/donationService";
+import { getCache, setCache } from "@/services/offlineCache";
 
 export default function ProfileScreen() {
   const { signOut, profile, user } = useAuth();
@@ -22,12 +23,38 @@ export default function ProfileScreen() {
       setDonorLoading(true);
       setDonationsLoading(true);
 
+      // Load cached profile details first
+      getCache(`donor_profile:${user.id}`).then(cachedProfile => {
+        if (cachedProfile) {
+          setDonorData(cachedProfile);
+          setDonorLoading(false);
+        }
+      });
+
+      // Load cached donations list first
+      getCache(`donations:${user.id}`).then(cachedDonations => {
+        if (cachedDonations) {
+          setDonations(cachedDonations);
+          setDonationsLoading(false);
+        }
+      });
+
       getDonorProfile(user.id)
-        .then(({ data }) => setDonorData(data))
+        .then(({ data }) => {
+          if (data) {
+            setDonorData(data);
+            setCache(`donor_profile:${user.id}`, data);
+          }
+        })
         .finally(() => setDonorLoading(false));
 
       getDonorDonations(user.id)
-        .then(({ data }) => setDonations(data || []))
+        .then(({ data }) => {
+          if (data) {
+            setDonations(data);
+            setCache(`donations:${user.id}`, data);
+          }
+        })
         .finally(() => setDonationsLoading(false));
     } else {
       setDonorLoading(false);

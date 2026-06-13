@@ -23,6 +23,7 @@ import { getDonorProfile, getCooldownStatus } from "@/services/donorService";
 import { getNearbyInstitutionCount, getNearbyInstitutions } from "@/services/institutionService";
 import { getActiveRequests } from "@/services/requestService";
 import { getDonorRequestStatuses, DonationStatus } from "@/services/donationService";
+import { getCache, setCache } from "@/services/offlineCache";
 
 const STATUS_CONFIG: Record<DonationStatus, { label: string; color: string; bg: string; borderColor: string; cardBg: string }> = {
   scheduled: { label: 'Scheduled', color: '#2563EB', bg: '#DBEAFE', borderColor: '#93C5FD', cardBg: '#EFF6FF' },
@@ -73,6 +74,28 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
+
+      // Load cache first for instant layout rendering
+      if (user?.id) {
+        getCache(`donor_profile:${user.id}`).then(cached => {
+          if (cached && !cancelled) {
+            if (cached.blood_type) setBloodType(cached.blood_type);
+            setCooldownInfo(getCooldownStatus(cached));
+          }
+        });
+        getCache(`request_statuses:${user.id}`).then(cachedStatuses => {
+          if (cachedStatuses && !cancelled) {
+            setRequestStatuses(new Map(cachedStatuses));
+          }
+        });
+      }
+      getCache('active_requests').then(cachedRequests => {
+        if (cachedRequests && !cancelled) {
+          setRequests(cachedRequests);
+          setLoading(false);
+        }
+      });
+
       async function fetchData() {
         setLoading(true);
         const bloodTypePromise = (async () => {
@@ -81,19 +104,27 @@ export default function HomeScreen() {
           if (!cancelled && data) {
             if (data.blood_type) setBloodType(data.blood_type);
             setCooldownInfo(getCooldownStatus(data));
+            setCache(`donor_profile:${user.id}`, data);
           }
         })();
         const requestsPromise = (async () => {
           try {
             const { data } = await getActiveRequests();
-            if (!cancelled && data) setRequests(data.slice(0, 5));
+            if (!cancelled && data) {
+              const sliced = data.slice(0, 5);
+              setRequests(sliced);
+              setCache('active_requests', sliced);
+            }
           } catch (e) { console.error('[iDonate:Home] Requests error', e); }
         })();
         const statusesPromise = (async () => {
           if (!user?.id) return;
           try {
             const result = await getDonorRequestStatuses(user.id);
-            if (!cancelled) setRequestStatuses(result.statuses);
+            if (!cancelled) {
+              setRequestStatuses(result.statuses);
+              setCache(`request_statuses:${user.id}`, Array.from(result.statuses.entries()));
+            }
           } catch (e) { console.error('[iDonate:Home] Statuses error', e); }
         })();
         const nearbyPromise = (async () => {

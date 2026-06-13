@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, View, TouchableOpacity, Alert } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, View, TouchableOpacity, Alert, Linking, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,6 +8,8 @@ import { ThemedText } from "@/components/themed-text";
 import { useAuth } from "@/contexts/AuthContext";
 import { getDonorDonations, cancelDonation, confirmDonorDonation, Donation } from "@/services/donationService";
 import { getDonorProfile, getCooldownStatus } from "@/services/donorService";
+import { extractCoords } from "@/services/institutionService";
+import { getCache, setCache } from "@/services/offlineCache";
 
 export default function DonationsScreen() {
   const { user } = useAuth();
@@ -18,22 +20,46 @@ export default function DonationsScreen() {
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [cooldownStatus, setCooldownStatus] = useState<{ isEligible: boolean; nextEligibleDate: Date | null; daysRemaining: number }>({ isEligible: true, nextEligibleDate: null, daysRemaining: 0 });
 
-  const loadDonations = () => {
+  const loadDonations = (showLoadingIndicator = true) => {
     if (user?.id) {
-      setLoading(true);
+      if (showLoadingIndicator) setLoading(true);
       getDonorProfile(user.id).then(({ data: donorProfile }) => {
-        if (donorProfile) setCooldownStatus(getCooldownStatus(donorProfile));
+        if (donorProfile) {
+          setCooldownStatus(getCooldownStatus(donorProfile));
+          setCache(`donor_profile:${user.id}`, donorProfile);
+        }
       });
       getDonorDonations(user.id)
-        .then(({ data }) => setDonations(data || []))
-        .finally(() => setLoading(false));
+        .then(({ data }) => {
+          if (data) {
+            setDonations(data);
+            setCache(`donations:${user.id}`, data);
+          }
+        })
+        .finally(() => {
+          if (showLoadingIndicator) setLoading(false);
+        });
     } else {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadDonations();
+    if (user?.id) {
+      // Load cache first for instant layout rendering
+      getCache(`donations:${user.id}`).then(cached => {
+        if (cached) {
+          setDonations(cached);
+          setLoading(false);
+        }
+      });
+      getCache(`donor_profile:${user.id}`).then(cachedProfile => {
+        if (cachedProfile) {
+          setCooldownStatus(getCooldownStatus(cachedProfile));
+        }
+      });
+    }
+    loadDonations(true);
   }, [user?.id]);
 
   const filteredDonations = donations.filter(d => {
@@ -87,6 +113,20 @@ export default function DonationsScreen() {
       ]
     );
   };
+  const handleGetDirections = (lat: number, lng: number, label: string) => {
+    const scheme = Platform.select({ ios: 'maps:0,0?q=', android: 'geo:0,0?q=' });
+    const latLng = `${lat},${lng}`;
+    const url = Platform.select({
+      ios: `${scheme}${encodeURIComponent(label)}@${latLng}`,
+      android: `${scheme}${latLng}(${encodeURIComponent(label)})`,
+    });
+
+    if (url) {
+      Linking.openURL(url).catch(() => {
+        Alert.alert('Navigation Error', 'Could not open mapping application.');
+      });
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -104,7 +144,7 @@ export default function DonationsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <ThemedText style={styles.headerTitle}>My Donations</ThemedText>
-        <TouchableOpacity onPress={loadDonations} style={styles.refreshBtn}>
+        <TouchableOpacity onPress={() => loadDonations(true)} style={styles.refreshBtn}>
           <Ionicons name="refresh" size={20} color="#64748B" />
         </TouchableOpacity>
       </View>
@@ -170,6 +210,7 @@ export default function DonationsScreen() {
               const dateNeeded = donation.blood_requests?.date_needed;
               const timeNeeded = donation.blood_requests?.time_needed;
               const requestedType = donation.blood_requests?.blood_type_needed;
+              const coords = extractCoords(donation.institutions?.location || donation.blood_requests?.hospital_location);
               
               const dateStr = new Date(donation.scheduled_date).toLocaleDateString(undefined, {
                 month: 'short', day: 'numeric', year: 'numeric'
@@ -212,6 +253,17 @@ export default function DonationsScreen() {
                       </View>
                     )}
                   </View>
+
+                  {/* Directions Button */}
+                  {(donation.status === 'scheduled' || donation.status === 'confirmed') && coords && (
+                    <TouchableOpacity 
+                      style={styles.navigateBtn}
+                      onPress={() => handleGetDirections(coords.lat, coords.lng, institutionName)}
+                    >
+                      <Ionicons name="navigate-outline" size={16} color="#2563EB" />
+                      <ThemedText style={styles.navigateBtnText}>Get Directions</ThemedText>
+                    </TouchableOpacity>
+                  )}
 
                   {/* Notes */}
                   {donation.notes && (
@@ -542,6 +594,23 @@ const styles = StyleSheet.create({
   waitingText: {
     color: '#D97706',
     fontSize: 12,
+    fontWeight: '700',
+  },
+  navigateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    marginBottom: 12,
+  },
+  navigateBtnText: {
+    color: '#2563EB',
+    fontSize: 13,
     fontWeight: '700',
   },
   fab: {

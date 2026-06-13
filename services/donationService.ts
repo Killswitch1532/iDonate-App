@@ -68,6 +68,7 @@ export async function getDonorDonations(donorId: string) {
       institutions (
         institution_name,
         address,
+        location,
         profiles!institutions_id_fkey (
           phone_number
         )
@@ -75,6 +76,7 @@ export async function getDonorDonations(donorId: string) {
       blood_requests (
         blood_type_needed,
         description,
+        hospital_location,
         profiles:requester_id (
           full_name
         )
@@ -336,4 +338,72 @@ async function updateDonorCooldown(donorId: string) {
     console.error('[iDonate:DonationService] updateDonorCooldown failed', e);
   }
 }
+
+/**
+ * Fetch operating hours and calculate slot capacity/availability for a given date
+ */
+export async function getAvailableSlots(institutionId: string, date: Date) {
+  const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
+
+  // 1. Fetch configured slots for this day of week
+  const { data: slots, error: slotsError } = await supabase
+    .from('institution_slots')
+    .select('*')
+    .eq('institution_id', institutionId)
+    .eq('day_of_week', dayOfWeek)
+    .order('start_time', { ascending: true });
+
+  if (slotsError || !slots) {
+    console.error('[iDonate:DonationService] getAvailableSlots failed fetching slots', slotsError);
+    return { data: [], error: slotsError };
+  }
+
+  // 2. Fetch existing bookings for this institution on this date
+  const { data: bookings, error: bookingsError } = await supabase
+    .from('donations')
+    .select('scheduled_date, status')
+    .eq('institution_id', institutionId)
+    .in('status', ['scheduled', 'confirmed', 'completed']);
+
+  if (bookingsError) {
+    console.error('[iDonate:DonationService] getAvailableSlots failed fetching bookings', bookingsError);
+    return { data: [], error: bookingsError };
+  }
+
+  // Filter bookings to just the target date (comparing local YYYY-MM-DD)
+  const targetDateBookings = (bookings || []).filter(b => {
+    try {
+      const bDateStr = new Date(b.scheduled_date).toISOString().split('T')[0];
+      return bDateStr === dateStr;
+    } catch {
+      return false;
+    }
+  });
+
+  // 3. For each slot, calculate the remaining capacity
+  const slotsWithCapacity = slots.map(slot => {
+    const slotStart = slot.start_time; // 'HH:MM:SS'
+    const slotEnd = slot.end_time;     // 'HH:MM:SS'
+
+    // Count bookings falling in this slot's time range
+    const bookingCount = targetDateBookings.filter(b => {
+      try {
+        const bTimeStr = new Date(b.scheduled_date).toTimeString().split(' ')[0]; // 'HH:MM:SS'
+        return bTimeStr >= slotStart && bTimeStr < slotEnd;
+      } catch {
+        return false;
+      }
+    }).length;
+
+    return {
+      ...slot,
+      booked_count: bookingCount,
+      slots_left: Math.max(0, slot.max_capacity - bookingCount),
+    };
+  });
+
+  return { data: slotsWithCapacity, error: null };
+}
+
 
