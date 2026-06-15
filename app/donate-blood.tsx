@@ -587,9 +587,8 @@ export default function DonateBloodScreen() {
                             style={[
                               styles.slotButton,
                               isSelected && styles.slotButtonSelected,
-                              isFull && styles.slotButtonDisabled,
+                              isFull && !isSelected && styles.slotButtonBusy,
                             ]}
-                            disabled={isFull}
                             onPress={() => {
                               setSelectedSlotId(slot.id);
                               if (slot.start_time) {
@@ -603,17 +602,18 @@ export default function DonateBloodScreen() {
                               }
                             }}
                           >
-                            <ThemedText style={[styles.slotTimeText, isSelected && styles.slotTimeTextSelected]}>
+                            <ThemedText style={[styles.slotTimeText, isSelected && styles.slotTimeTextSelected, isFull && !isSelected && { color: '#92400E' }]}>
                               {startTimeStr} - {endTimeStr}
                             </ThemedText>
                             <ThemedText
                               style={[
                                 styles.slotCapacityText,
                                 isSelected && styles.slotCapacityTextSelected,
-                                isFull && styles.slotCapacityTextFull,
+                                isFull && !isSelected && styles.slotCapacityTextBusy,
+                                isFull && isSelected && styles.slotCapacityTextSelected,
                               ]}
                             >
-                              {isFull ? 'Fully Booked' : `${slot.slots_left} slot${slot.slots_left !== 1 ? 's' : ''} left`}
+                              {isFull ? 'High Demand' : `${slot.slots_left} slot${slot.slots_left !== 1 ? 's' : ''} left`}
                             </ThemedText>
                           </TouchableOpacity>
                         );
@@ -1139,6 +1139,10 @@ const styles = StyleSheet.create({
     borderColor: '#E8E8E8',
     opacity: 0.6,
   },
+  slotButtonBusy: {
+    borderColor: '#F59E0B',
+    backgroundColor: '#FEF3C7',
+  },
   slotTimeText: {
     fontSize: 15,
     fontWeight: '600',
@@ -1159,6 +1163,10 @@ const styles = StyleSheet.create({
   slotCapacityTextFull: {
     color: '#C0392B',
     fontWeight: '600',
+  },
+  slotCapacityTextBusy: {
+    color: '#D97706',
+    fontWeight: '700',
   },
   slotsLabel: {
     fontSize: 14,
