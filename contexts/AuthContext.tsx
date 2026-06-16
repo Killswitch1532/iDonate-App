@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { clearSupabaseAuthStorage, supabase } from '@/lib/supabase';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { registerForPushNotifications, savePushToken, clearPushToken } from '@/services/notificationService';
@@ -33,6 +33,17 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function isMissingRefreshTokenError(error: any) {
+    const message = String(error?.message ?? '').toLowerCase();
+    const code = String(error?.code ?? '').toLowerCase();
+
+    return (
+        code === 'refresh_token_not_found' ||
+        message.includes('invalid refresh token') ||
+        message.includes('refresh token not found')
+    );
+}
+
 export function useAuth() {
     const context = useContext(AuthContext);
     if (!context) {
@@ -47,24 +58,87 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [profile, setProfile] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        // Get initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session);
-            setUser(session?.user ?? null);
-            if (session?.user) {
-                fetchProfile(session.user.id);
-                // Register for push notifications on app start if session exists
-                registerForPushNotifications().then(token => {
-                    if (token) savePushToken(session.user.id, token);
-                });
-            }
-            setLoading(false);
+    async function clearInvalidLocalSession(error: any) {
+        console.warn('[iDonate:Auth] Clearing invalid local Supabase session', {
+            code: error?.code,
+            message: error?.message,
+            status: error?.status,
         });
+
+        try {
+            await supabase.auth.signOut({ scope: 'local' });
+        } catch (signOutError) {
+            console.warn('[iDonate:Auth] Local sign-out cleanup failed', signOutError);
+        }
+
+        try {
+            await clearSupabaseAuthStorage();
+        } catch (storageError) {
+            console.warn('[iDonate:Auth] Auth storage cleanup failed', storageError);
+        }
+
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+    }
+
+    useEffect(() => {
+        let isMounted = true;
+
+        async function loadInitialSession() {
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+
+                if (!isMounted) return;
+
+                if (error) {
+                    if (isMissingRefreshTokenError(error)) {
+                        await clearInvalidLocalSession(error);
+                    } else {
+                        console.error('[iDonate:Auth] getSession failed', {
+                            code: error.code,
+                            message: error.message,
+                            status: error.status,
+                        });
+                        setSession(null);
+                        setUser(null);
+                        setProfile(null);
+                    }
+                    return;
+                }
+
+                setSession(session);
+                setUser(session?.user ?? null);
+                if (session?.user) {
+                    fetchProfile(session.user.id);
+                    // Register for push notifications on app start if session exists
+                    registerForPushNotifications().then(token => {
+                        if (token) savePushToken(session.user.id, token);
+                    });
+                }
+            } catch (error) {
+                if (!isMounted) return;
+
+                if (isMissingRefreshTokenError(error)) {
+                    await clearInvalidLocalSession(error);
+                } else {
+                    console.error('[iDonate:Auth] getSession threw', error);
+                    setSession(null);
+                    setUser(null);
+                    setProfile(null);
+                }
+            } finally {
+                if (isMounted) setLoading(false);
+            }
+        }
+
+        loadInitialSession();
 
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (_event, session) => {
+                if (!isMounted) return;
+
                 setSession(session);
                 setUser(session?.user ?? null);
                 if (session?.user) {
@@ -93,7 +167,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
         );
 
-        return () => subscription.unsubscribe();
+        return () => {
+            isMounted = false;
+            subscription.unsubscribe();
+        };
     }, []);
 
     async function fetchProfile(userId: string) {
@@ -268,12 +345,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     async function signOut() {
-        if (user?.id) await clearPushToken(user.id);
+        if (user?.id) {
+            try {
+                await clearPushToken(user.id);
+            } catch (error) {
+                console.warn('[iDonate:Auth] Failed to clear push token during sign-out', error);
+            }
+        }
+
         // Also sign out from Google if native module is available
         if (GoogleSignin) {
             try { await GoogleSignin.signOut(); } catch {}
         }
-        await supabase.auth.signOut();
+
+        try {
+            const { error } = await supabase.auth.signOut();
+            if (error) {
+                if (isMissingRefreshTokenError(error)) {
+                    await clearInvalidLocalSession(error);
+                    return;
+                }
+
+                console.error('[iDonate:Auth] signOut failed', {
+                    code: error.code,
+                    message: error.message,
+                    status: error.status,
+                });
+            }
+        } catch (error) {
+            if (isMissingRefreshTokenError(error)) {
+                await clearInvalidLocalSession(error);
+                return;
+            }
+
+            console.error('[iDonate:Auth] signOut threw', error);
+        }
+
+        setSession(null);
+        setUser(null);
+        setProfile(null);
     }
 
     async function refreshProfile() {
