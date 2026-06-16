@@ -4,6 +4,7 @@ import { clearSupabaseAuthStorage, supabase } from '@/lib/supabase';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { registerForPushNotifications, savePushToken, clearPushToken } from '@/services/notificationService';
+import { upsertDonorProfile } from '@/services/donorService';
 
 // Try to load native Google Sign-In (requires dev build with native module)
 // Falls back to browser-based OAuth if not available
@@ -110,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setSession(session);
                 setUser(session?.user ?? null);
                 if (session?.user) {
-                    fetchProfile(session.user.id);
+                    await handleNewUserSignIn(session.user);
                     // Register for push notifications on app start if session exists
                     registerForPushNotifications().then(token => {
                         if (token) savePushToken(session.user.id, token);
@@ -142,25 +143,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setSession(session);
                 setUser(session?.user ?? null);
                 if (session?.user) {
-                    fetchProfile(session.user.id);
+                    await handleNewUserSignIn(session.user, _event);
 
-                    // For Google sign-ins, save avatar_url if available
-                    if (_event === 'SIGNED_IN') {
-                        const meta = session.user.user_metadata;
-                        const avatarUrl = meta?.avatar_url || meta?.picture || null;
-                        if (avatarUrl) {
-                            console.log('[iDonate:Auth] Saving Google avatar_url to profile');
-                            await supabase
-                                .from('profiles')
-                                .update({ avatar_url: avatarUrl })
-                                .eq('id', session.user.id);
-                        }
-
-                        // Register for push notifications on sign-in
-                        registerForPushNotifications().then(token => {
-                            if (token) savePushToken(session.user.id, token);
-                        });
-                    }
+                    // Register for push notifications on sign-in
+                    registerForPushNotifications().then(token => {
+                        if (token) savePushToken(session.user.id, token);
+                    });
                 } else {
                     setProfile(null);
                 }
@@ -172,6 +160,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             subscription.unsubscribe();
         };
     }, []);
+
+    async function handleNewUserSignIn(user: User, event?: string) {
+        const meta = user.user_metadata;
+        
+        // Make sure profile has full_name and user_type (donor)
+        let fullName = meta?.full_name || meta?.name || '';
+        let phoneNumber = meta?.phone_number || meta?.phone || '';
+        
+        // Update profiles table if needed
+        const { data: existingProfile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .maybeSingle();
+
+        if (!existingProfile || !existingProfile.full_name || !existingProfile.user_type) {
+            await supabase
+                .from('profiles')
+                .upsert({
+                    id: user.id,
+                    full_name: fullName,
+                    user_type: 'donor',
+                    phone_number: phoneNumber,
+                    avatar_url: meta?.avatar_url || meta?.picture || null,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'id' });
+        }
+
+        // Save avatar_url if available
+        const avatarUrl = meta?.avatar_url || meta?.picture || null;
+        if (avatarUrl && (!existingProfile || existingProfile.avatar_url !== avatarUrl)) {
+            console.log('[iDonate:Auth] Saving Google avatar_url to profile');
+            await supabase
+                .from('profiles')
+                .update({ avatar_url: avatarUrl, updated_at: new Date().toISOString() })
+                .eq('id', user.id);
+        }
+
+        // Check if donor profile exists
+        const { data: existingDonor } = await supabase
+            .from('donors')
+            .select('*')
+            .eq('id', user.id)
+            .maybeSingle();
+        
+        if (!existingDonor) {
+            console.log('[iDonate:Auth] Creating donor profile for Google sign-in user');
+            await upsertDonorProfile(user.id, {});
+        }
+
+        // Now fetch the complete profile
+        await fetchProfile(user.id);
+    }
 
     async function fetchProfile(userId: string) {
         const { data, error } = await supabase
@@ -270,7 +311,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
                 if (!idToken) {
                     console.error('[iDonate:Auth] No ID token from Google');
-                    return { error: { message: 'Google sign-in failed — no ID token received' } };
+                    throw new Error('Google sign-in failed — no ID token received');
                 }
 
                 const { data, error } = await supabase.auth.signInWithIdToken({
@@ -280,7 +321,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
                 if (error) {
                     console.error('[iDonate:Auth] signInWithIdToken error:', error.message);
-                    return { error };
+                    throw error;
                 }
 
                 console.log('[iDonate:Auth] Google Sign-In complete:', data?.user?.email);
@@ -289,15 +330,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 if (e?.code === 'SIGN_IN_CANCELLED' || e?.code === '12501') {
                     return { error: null }; // User cancelled
                 }
-                console.error('[iDonate:Auth] Native Google Sign-In failed:', e?.message);
-                return { error: { message: e?.message || 'Google sign-in failed' } };
+                console.warn('[iDonate:Auth] Native Google Sign-In failed, falling back to browser:', e?.message);
+                // Fall through to browser-based OAuth
             }
         }
 
-        // ─── Strategy 2: Browser-based OAuth fallback (Expo Go) ─────
+        // ─── Strategy 2: Browser-based OAuth fallback (Expo Go or native failed) ─────
         try {
             console.log('[iDonate:Auth] Using browser-based Google OAuth');
-            const redirectUrl = 'idonateapp://google-auth';
+            let redirectUrl = 'idonateapp://google-auth';
+            if (process.env.EXPO_PUBLIC_APP_ENV === 'development') {
+                redirectUrl = 'idonateapp-dev://google-auth';
+            } else if (process.env.EXPO_PUBLIC_APP_ENV === 'preview') {
+                redirectUrl = 'idonateapp-preview://google-auth';
+            }
 
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
