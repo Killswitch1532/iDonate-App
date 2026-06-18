@@ -1,11 +1,12 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 
 
-const { width } = Dimensions.get('window');
+const { height, width } = Dimensions.get('window');
 
 export default function OnboardingScreen() {
   const [currentPage, setCurrentPage] = useState(0);
@@ -19,7 +20,9 @@ export default function OnboardingScreen() {
       subtitle: 'Join our community of heroes',
       description: 'Every donation can save up to 3 lives. Your blood type could be the perfect match for someone in need.',
       tip: '💡 Tip: O- blood is the universal donor type and is always in high demand.',
-      backgroundColor: '#FFF5F5',
+      gradient: ['#FF5F6D', '#FFC371'],
+      bgColor: '#FFF5F5',
+      image: require('../assets/images/onboarding/people_holding_hands.jpg'),
     },
     {
       id: 2,
@@ -29,7 +32,9 @@ export default function OnboardingScreen() {
       subtitle: 'Locate donation centers easily',
       description: 'Discover hospitals and blood banks near you. Get directions, check availability, and book appointments.',
       tip: '💡 Tip: Regular donors can donate every 56 days. Mark your calendar for your next donation!',
-      backgroundColor: '#F0F8FF',
+      gradient: ['#667eea', '#764ba2'],
+      bgColor: '#F0F8FF',
+      image: require('../assets/images/onboarding/ongoing_blood_donation.jpg'),
     },
     {
       id: 3,
@@ -39,7 +44,9 @@ export default function OnboardingScreen() {
       subtitle: 'See the difference you make',
       description: 'Monitor your donation history, track lives saved, and receive notifications for urgent blood requests.',
       tip: '💡 Tip: One pint of blood can help multiple patients when separated into components.',
-      backgroundColor: '#F0FFF4',
+      gradient: ['#11998e', '#38ef7d'],
+      bgColor: '#F0FFF4',
+      image: require('../assets/images/onboarding/blood_bag.jpg'),
     },
     {
       id: 4,
@@ -49,7 +56,9 @@ export default function OnboardingScreen() {
       subtitle: 'Your privacy matters',
       description: 'All donations are tested for safety. Your personal information is protected, and you can donate anonymously.',
       tip: '💡 Tip: Blood is tested for HIV, hepatitis, and other infectious diseases before use.',
-      backgroundColor: '#F8F0FF',
+      gradient: ['#a8edea', '#fed6e3'],
+      bgColor: '#F8F0FF',
+      image: require('../assets/images/onboarding/secure.jpg'),
     },
   ];
 
@@ -68,89 +77,115 @@ export default function OnboardingScreen() {
   const currentData = onboardingData[currentPage];
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: currentData.backgroundColor }]}>
-      <View style={styles.container}>
-        {/* Header */}
-         <View style={styles.header}>
-           <TouchableOpacity onPress={skipOnboarding} style={styles.skipButton}>
-             <Text style={styles.skipText}>Skip</Text>
-           </TouchableOpacity>
-         </View>
-
-        {/* Content */}
-        <View style={styles.content}>
-          {/* Icon */}
-          <View style={styles.iconContainer}>
-            <MaterialIcons 
-              name={currentData.icon as any} 
-              size={120} 
-              color={currentData.iconColor} 
-              style={styles.icon} 
-            />
+    <View style={styles.container}>
+      {/* Background Image */}
+      <Image
+        source={currentData.image}
+        style={styles.backgroundImage}
+        key={currentPage}
+        resizeMode="cover"
+      />
+      
+      {/* Gradient Overlay */}
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.9)']}
+        style={styles.gradientOverlay}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+      />
+      
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.contentContainer}>
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={skipOnboarding} style={styles.skipButton}>
+              <Text style={styles.skipText}>Skip</Text>
+            </TouchableOpacity>
           </View>
 
-           {/* Text Content */}
-           <View style={styles.textContainer}>
-             <Text style={styles.title}>{currentData.title}</Text>
-             <Text style={styles.subtitle}>{currentData.subtitle}</Text>
-             <Text style={styles.description}>{currentData.description}</Text>
-             
-             {/* Health Tip */}
-             <View style={styles.tipContainer}>
-               <Text style={styles.tipText}>{currentData.tip}</Text>
-             </View>
-           </View>
-        </View>
-
-        {/* Bottom Section */}
-        <View style={styles.bottomSection}>
-          {/* Page Indicators */}
-          <View style={styles.pageIndicators}>
-            {onboardingData.map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.pageIndicator,
-                  index === currentPage && styles.activePageIndicator,
-                  { backgroundColor: index === currentPage ? currentData.iconColor : '#E5E5E5' }
-                ]}
-              />
-            ))}
+          {/* Content */}
+          <View style={styles.content} key={currentPage}>
+            {/* Text Content */}
+            <View style={styles.textContainer}>
+              <Text style={styles.title}>{currentData.title}</Text>
+              <Text style={styles.subtitle}>{currentData.subtitle}</Text>
+              <Text style={styles.description}>{currentData.description}</Text>
+              
+              {/* Health Tip */}
+              <View style={styles.tipContainer}>
+                <Text style={styles.tipText}>{currentData.tip}</Text>
+              </View>
+            </View>
           </View>
 
-          {/* Action Buttons */}
-          <View style={styles.actionButtons}>
-            {currentPage > 0 && (
+          {/* Bottom Section */}
+          <View style={styles.bottomSection}>
+            {/* Page Indicators */}
+            <View style={styles.pageIndicators}>
+              {onboardingData.map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.pageIndicator,
+                    index === currentPage && styles.activePageIndicator,
+                    { backgroundColor: index === currentPage ? '#E74C3C' : '#E5E5E5' }
+                  ]}
+                />
+              ))}
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.actionButtons}>
+              {currentPage > 0 && (
+                 <TouchableOpacity
+                   style={styles.backButton}
+                   onPress={() => setCurrentPage(currentPage - 1)}
+                 >
+                   <MaterialIcons name="arrow-back" size={20} color="#7F8C8D" />
+                   <Text style={styles.backButtonText}>Back</Text>
+                 </TouchableOpacity>
+               )}
+               
                <TouchableOpacity
-                 style={styles.backButton}
-                 onPress={() => setCurrentPage(currentPage - 1)}
+                 style={[styles.nextButton, { backgroundColor: '#E74C3C' }]}
+                 onPress={nextPage}
                >
-                 <MaterialIcons name="arrow-back" size={20} color="#7F8C8D" />
-                 <Text style={styles.backButtonText}>Back</Text>
+                 <Text style={styles.nextButtonText}>
+                   {currentPage === onboardingData.length - 1 ? 'Get Started' : 'Next'}
+                 </Text>
+                 <MaterialIcons name="arrow-forward" size={20} color="#FFFFFF" />
                </TouchableOpacity>
-             )}
-             
-             <TouchableOpacity
-               style={[styles.nextButton, { backgroundColor: currentData.iconColor }]}
-               onPress={nextPage}
-             >
-               <Text style={styles.nextButtonText}>
-                 {currentPage === onboardingData.length - 1 ? 'Get Started' : 'Next'}
-               </Text>
-               <MaterialIcons name="arrow-forward" size={20} color="#FFFFFF" />
-             </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  backgroundImage: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: height,
+    width: width,
+  },
+  gradientOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: height,
+  },
   safeArea: {
     flex: 1,
   },
-  container: {
+  contentContainer: {
     flex: 1,
     paddingHorizontal: 24,
   },
@@ -163,46 +198,48 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   skipButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   skipText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#7F8C8D',
+    color: '#2C3E50',
     fontFamily: 'System',
   },
 
   // Content
   content: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
     alignItems: 'center',
-  },
-  iconContainer: {
-    marginBottom: 40,
-    alignItems: 'center',
-  },
-  icon: {
-    // Icon styling handled by MaterialIcons component
+    paddingBottom: 40,
   },
   textContainer: {
     alignItems: 'center',
     paddingHorizontal: 16,
   },
   title: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: 'bold',
-    color: '#2C3E50',
+    color: '#FFFFFF',
     textAlign: 'center',
     marginBottom: 12,
     fontFamily: 'System',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   subtitle: {
-    fontSize: 18,
-    color: '#7F8C8D',
+    fontSize: 20,
+    color: 'rgba(255, 255, 255, 0.95)',
     textAlign: 'center',
     marginBottom: 24,
     fontWeight: '600',
@@ -210,25 +247,30 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 16,
-    color: '#2C3E50',
+    color: '#FFFFFF',
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 26,
     marginBottom: 32,
     fontWeight: '400',
     fontFamily: 'System',
   },
   tipContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 20,
     padding: 20,
-    borderLeftWidth: 4,
-    borderLeftColor: '#F39C12',
+    borderLeftWidth: 5,
+    borderLeftColor: '#E74C3C',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
   },
   tipText: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#2C3E50',
     fontStyle: 'italic',
-    lineHeight: 20,
+    lineHeight: 22,
     fontWeight: '500',
     fontFamily: 'System',
   },
@@ -249,7 +291,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   activePageIndicator: {
-    width: 24,
+    width: 28,
   },
   actionButtons: {
     flexDirection: 'row',
@@ -259,11 +301,16 @@ const styles = StyleSheet.create({
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 25,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   backButtonText: {
     fontSize: 16,
@@ -274,18 +321,18 @@ const styles = StyleSheet.create({
   nextButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 25,
-    gap: 8,
+    paddingHorizontal: 36,
+    paddingVertical: 18,
+    borderRadius: 30,
+    gap: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
   },
   nextButtonText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: '#FFFFFF',
     fontFamily: 'System',
