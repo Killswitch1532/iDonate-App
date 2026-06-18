@@ -59,12 +59,18 @@ function RootLayoutNav() {
     }
   }, [appIsReady, loading, user]);
 
-  // Handle notification taps → navigate to donate-blood (safe in Expo Go)
+  // Handle notification taps → navigate to appropriate screen
   useEffect(() => {
     let cleanup: (() => void) | undefined;
     setupNotificationListeners((data) => {
-      if (data?.requestId) {
-        // Use object syntax to avoid type errors with dynamic routes
+      if (data?.notificationId) {
+        // Navigate to notification detail screen if we have notification ID
+        router.push({
+          pathname: '/notification-detail',
+          params: { id: data.notificationId }
+        } as any);
+      } else if (data?.requestId) {
+        // Fall back to blood request detail if no notification ID
         router.push({
           pathname: '/blood-request/[id]',
           params: { id: data.requestId }

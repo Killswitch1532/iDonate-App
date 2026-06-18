@@ -7,6 +7,12 @@ import * as Location from 'expo-location';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Constants from 'expo-constants';
 
+import { ThemedText } from '@/components/themed-text';
+import { useAuth } from '@/contexts/AuthContext';
+import { getDonorProfile, upsertDonorProfile, getCooldownStatus } from '@/services/donorService';
+import { Institution, getNearbyInstitutions } from '@/services/institutionService';
+import { bookDonation, getAvailableSlots } from '@/services/donationService';
+
 // react-native-maps requires a dev build — gracefully degrade in Expo Go
 let MapView: any = null;
 let Marker: any = null;
@@ -24,12 +30,6 @@ try {
   console.log('[iDonate:DonateBlood] Maps module not available, falling back to static view');
 }
 const GOOGLE_MAPS_APIKEY = Constants.expoConfig?.android?.config?.googleMaps?.apiKey || '';
-
-import { ThemedText } from '@/components/themed-text';
-import { useAuth } from '@/contexts/AuthContext';
-import { getDonorProfile, upsertDonorProfile, getCooldownStatus } from '@/services/donorService';
-import { Institution, getNearbyInstitutions } from '@/services/institutionService';
-import { bookDonation, getAvailableSlots } from '@/services/donationService';
 
 export default function DonateBloodScreen() {
   const { user } = useAuth();

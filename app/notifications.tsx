@@ -39,7 +39,7 @@ export default function NotificationsScreen() {
     };
   }, [resetBadgeCount]);
 
-  const filters = ["All", "Requests", "Reminders"];
+  const filters = ["All", "Requests", "Broadcasts", "Reminders"];
 
   const loadNotifications = useCallback(async (showLoading = true) => {
     if (!user?.id) return;
@@ -68,20 +68,22 @@ export default function NotificationsScreen() {
   };
 
   const handleNotificationPress = async (notification: Notification) => {
-    // Remove from local list immediately
-    setNotifications(prev => prev.filter(n => n.id !== notification.id));
-
-    // Delete from database and refresh counts
-    await deleteNotification(notification.id);
-    refreshUnreadCount();
-
-    // Navigate to the relevant screen
-    if (notification.data?.requestId) {
-      router.push({
-        pathname: '/blood-request/[id]',
-        params: { id: notification.data.requestId }
-      } as any);
+    // Mark as read first if unread
+    if (!notification.is_read) {
+      const { error } = await markAsRead(notification.id);
+      if (!error) {
+        setNotifications(prev => prev.map(n => 
+          n.id === notification.id ? { ...n, is_read: true } : n
+        ));
+        refreshUnreadCount();
+      }
     }
+
+    // Navigate to notification detail screen
+    router.push({
+      pathname: '/notification-detail',
+      params: { id: notification.id }
+    } as any);
   };
 
   const handleMarkAllRead = async () => {
@@ -134,6 +136,7 @@ export default function NotificationsScreen() {
     switch (type) {
       case 'urgent_request': return { name: 'warning', color: '#E74C3C' };
       case 'appointment_confirmed': return { name: 'check-circle', color: '#27AE60' };
+      case 'system_broadcast': return { name: 'campaign', color: '#4A90E2' };
       default: return { name: 'notifications', color: '#4A90E2' };
     }
   };
@@ -141,6 +144,7 @@ export default function NotificationsScreen() {
   const filteredNotifications = notifications.filter(n => {
     if (selectedFilter === 'All') return true;
     if (selectedFilter === 'Requests') return n.type === 'urgent_request';
+    if (selectedFilter === 'Broadcasts') return n.type === 'system_broadcast';
     if (selectedFilter === 'Reminders') return n.type === 'reminder';
     return true;
   });
@@ -201,7 +205,9 @@ export default function NotificationsScreen() {
             <ActivityIndicator size="large" color="#E74C3C" style={{ marginTop: 50 }} />
           ) : filteredNotifications.length === 0 ? (
             <View style={styles.emptyState}>
-              <MaterialIcons name="notifications-none" size={64} color="#CBD5E1" />
+              <View style={styles.emptyIconContainer}>
+                <MaterialIcons name="notifications-none" size={72} color="#E74C3C" />
+              </View>
               <ThemedText style={styles.emptyTitle}>All caught up!</ThemedText>
               <ThemedText style={styles.emptyDescription}>
                 New blood requests and updates will appear here.
@@ -210,19 +216,28 @@ export default function NotificationsScreen() {
           ) : (
             filteredNotifications.map((n) => {
               const icon = getIcon(n.type);
+              const handleDelete = async () => {
+                setNotifications(prev => prev.filter(x => x.id !== n.id));
+                await deleteNotification(n.id);
+                refreshUnreadCount();
+              };
+              
               return (
-                <TouchableOpacity
+                <View
                   key={n.id}
                   style={[
                     styles.notificationCard,
                     !n.is_read && styles.unreadCard,
                   ]}
-                  onPress={() => handleNotificationPress(n)}
                 >
-                  <View style={styles.notificationContent}>
+                  <TouchableOpacity
+                    style={styles.notificationContent}
+                    onPress={() => handleNotificationPress(n)}
+                    activeOpacity={0.7}
+                  >
                     <View style={styles.iconContainer}>
-                      <View style={[styles.iconCircle, { backgroundColor: icon.color + '15' }]}>
-                        <MaterialIcons name={icon.name as any} size={22} color={icon.color} />
+                      <View style={[styles.iconCircle, { backgroundColor: icon.color + '20' }]}>
+                        <MaterialIcons name={icon.name as any} size={26} color={icon.color} />
                       </View>
                       {!n.is_read && <View style={styles.unreadDot} />}
                     </View>
@@ -239,8 +254,15 @@ export default function NotificationsScreen() {
                         {n.message}
                       </ThemedText>
                     </View>
-                  </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.deleteBtn}
+                    onPress={handleDelete}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <MaterialIcons name="delete-outline" size={22} color="#94A3B8" />
+                  </TouchableOpacity>
+                </View>
               );
             })
           )}
@@ -249,11 +271,15 @@ export default function NotificationsScreen() {
         {notifications.length > 0 && (
           <View style={styles.quickActions}>
             <TouchableOpacity style={styles.quickActionButton} onPress={handleMarkAllRead}>
-              <MaterialIcons name="done-all" size={18} color="#4A90E2" />
+              <View style={[styles.quickActionIconContainer, { backgroundColor: '#EBF8FF' }]}>
+                <MaterialIcons name="done-all" size={20} color="#3182CE" />
+              </View>
               <ThemedText style={styles.quickActionText}>Mark all as read</ThemedText>
             </TouchableOpacity>
             <TouchableOpacity style={styles.quickActionButton} onPress={handleClearAll}>
-              <MaterialIcons name="delete-sweep" size={18} color="#E74C3C" />
+              <View style={[styles.quickActionIconContainer, { backgroundColor: '#FFF5F5' }]}>
+                <MaterialIcons name="delete-sweep" size={20} color="#E74C3C" />
+              </View>
               <ThemedText style={styles.quickActionText}>Clear all notifications</ThemedText>
             </TouchableOpacity>
           </View>
@@ -266,119 +292,161 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F8F4F4",
+    backgroundColor: "#F5F7FA",
   },
   container: {
     flex: 1,
   },
   contentContainer: {
-    padding: 16,
+    padding: 20,
     paddingBottom: 40,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
     backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    borderBottomWidth: 0,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 4,
   },
   headerTitleRow: {
     flexDirection: "row",
     alignItems: "center",
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#2C3E50",
+    fontSize: 26,
+    fontWeight: "800",
+    color: "#1A202C",
   },
   countBadge: {
     backgroundColor: "#E74C3C",
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    marginLeft: 8,
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginLeft: 12,
+    shadowColor: "#E74C3C",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
   },
   countBadgeText: {
     color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "bold",
+    fontSize: 13,
+    fontWeight: "800",
   },
   backBtn: {
-    padding: 4,
+    padding: 8,
+    backgroundColor: "#F8F9FA",
+    borderRadius: 12,
   },
   filtersSection: {
     backgroundColor: "#FFFFFF",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    paddingVertical: 16,
+    paddingTop: 24,
+    borderBottomWidth: 0,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    elevation: 2,
   },
   filtersContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
   },
   filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "#F0F4F8",
-    marginRight: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 24,
+    backgroundColor: "#F0F2F5",
+    marginRight: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.02,
+    shadowRadius: 2,
+    elevation: 1,
   },
   selectedFilterButton: {
     backgroundColor: "#E74C3C",
+    shadowColor: "#E74C3C",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 4,
   },
   filterText: {
-    fontSize: 14,
-    color: "#7F8C8D",
-    fontWeight: "600",
+    fontSize: 15,
+    color: "#64748B",
+    fontWeight: "700",
   },
   selectedFilterText: {
     color: "#FFFFFF",
   },
   notificationsSection: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   notificationCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowRadius: 12,
+    elevation: 5,
   },
   unreadCard: {
-    backgroundColor: "#F9FAFB",
-    borderLeftWidth: 4,
-    borderLeftColor: "#E74C3C",
+    backgroundColor: "#FFF5F5",
+    borderLeftWidth: 0,
+    borderWidth: 1,
+    borderColor: "#FECACA",
   },
   notificationContent: {
     flexDirection: "row",
+    flex: 1,
+  },
+  deleteBtn: {
+    padding: 8,
+    marginLeft: 8,
   },
   iconContainer: {
     position: "relative",
-    marginRight: 12,
+    marginRight: 16,
   },
   iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     justifyContent: "center",
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 3,
   },
   unreadDot: {
     position: "absolute",
-    top: 2,
-    right: 2,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    top: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     backgroundColor: "#E74C3C",
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: "#FFFFFF",
+    shadowColor: "#E74C3C",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 3,
+    elevation: 2,
   },
   notificationText: {
     flex: 1,
@@ -387,67 +455,93 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 4,
+    marginBottom: 8,
   },
   notificationTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#2C3E50",
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1A202C",
     flex: 1,
-    marginRight: 8,
+    marginRight: 12,
   },
   unreadTitle: {
-    color: "#E74C3C",
+    color: "#C53030",
   },
   notificationTime: {
-    fontSize: 11,
-    color: "#94A3B8",
+    fontSize: 12,
+    color: "#A0AEC0",
+    fontWeight: "600",
   },
   notificationMessage: {
-    fontSize: 13,
-    color: "#64748B",
-    lineHeight: 18,
+    fontSize: 14,
+    color: "#4A5568",
+    lineHeight: 20,
+    fontWeight: "500",
   },
   emptyState: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 60,
+    paddingVertical: 80,
+  },
+  emptyIconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "#FFF5F5",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#E74C3C",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
   },
   emptyTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#2C3E50",
-    marginTop: 16,
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#1A202C",
+    marginTop: 24,
   },
   emptyDescription: {
-    fontSize: 14,
-    color: "#94A3B8",
+    fontSize: 15,
+    color: "#718096",
     textAlign: "center",
-    marginTop: 8,
-    paddingHorizontal: 40,
+    marginTop: 12,
+    paddingHorizontal: 48,
+    lineHeight: 22,
   },
   quickActions: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    flexDirection: "column",
     gap: 12,
-    marginTop: 8,
+    marginTop: 12,
   },
   quickActionButton: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-start",
     backgroundColor: "#FFFFFF",
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+    borderWidth: 0,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  quickActionIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
   },
   quickActionText: {
-    marginLeft: 8,
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#475569",
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#4A5568",
   },
 });
 
