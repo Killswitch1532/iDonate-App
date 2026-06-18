@@ -39,7 +39,7 @@ export default function NotificationsScreen() {
     };
   }, [resetBadgeCount]);
 
-  const filters = ["All", "Requests", "Reminders"];
+  const filters = ["All", "Requests", "Broadcasts", "Reminders"];
 
   const loadNotifications = useCallback(async (showLoading = true) => {
     if (!user?.id) return;
@@ -79,13 +79,11 @@ export default function NotificationsScreen() {
       }
     }
 
-    // Navigate to the relevant screen
-    if (notification.data?.requestId) {
-      router.push({
-        pathname: '/blood-request/[id]',
-        params: { id: notification.data.requestId }
-      } as any);
-    }
+    // Navigate to notification detail screen
+    router.push({
+      pathname: '/notification-detail',
+      params: { id: notification.id }
+    } as any);
   };
 
   const handleMarkAllRead = async () => {
@@ -138,6 +136,7 @@ export default function NotificationsScreen() {
     switch (type) {
       case 'urgent_request': return { name: 'warning', color: '#E74C3C' };
       case 'appointment_confirmed': return { name: 'check-circle', color: '#27AE60' };
+      case 'system_broadcast': return { name: 'campaign', color: '#4A90E2' };
       default: return { name: 'notifications', color: '#4A90E2' };
     }
   };
@@ -145,6 +144,7 @@ export default function NotificationsScreen() {
   const filteredNotifications = notifications.filter(n => {
     if (selectedFilter === 'All') return true;
     if (selectedFilter === 'Requests') return n.type === 'urgent_request';
+    if (selectedFilter === 'Broadcasts') return n.type === 'system_broadcast';
     if (selectedFilter === 'Reminders') return n.type === 'reminder';
     return true;
   });

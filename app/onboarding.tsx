@@ -31,7 +31,7 @@ export default function OnboardingScreen() {
       title: 'Find Nearby Centers',
       subtitle: 'Locate donation centers easily',
       description: 'Discover hospitals and blood banks near you. Get directions, check availability, and book appointments.',
-      tip: '💡 Tip: Regular donors can donate every 56 days. Mark your calendar for your next donation!',
+      tip: '💡 Tip: Regular donors can donate every 90 days. Mark your calendar for your next donation!',
       gradient: ['#667eea', '#764ba2'],
       bgColor: '#F0F8FF',
       image: require('../assets/images/onboarding/ongoing_blood_donation.jpg'),

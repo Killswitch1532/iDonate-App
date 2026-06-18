@@ -13,7 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import MapView, { Marker } from "react-native-maps";
+import MapView, { Marker, Polyline } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
@@ -109,11 +109,28 @@ export default function MapScreen() {
   }, []);
 
   const openDirections = (inst: InstitutionWithDistance) => {
+    const destination = `${inst.latitude},${inst.longitude}`;
+    const label = encodeURIComponent(inst.institution_name);
+    
     const url = Platform.select({
-      ios: `maps:0,0?q=${inst.latitude},${inst.longitude}`,
-      android: `google.navigation:q=${inst.latitude},${inst.longitude}`,
+      ios: `http://maps.apple.com/?daddr=${destination}&address=${label}&directionsmode=driving`,
+      android: `google.navigation:q=${destination}&mode=d`,
     });
-    if (url) Linking.openURL(url);
+    
+    if (url) {
+      Linking.canOpenURL(url).then(supported => {
+        if (supported) {
+          Linking.openURL(url);
+        } else {
+          // Fallback to Google Maps URL if native app is not available
+          const fallbackUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
+          Linking.openURL(fallbackUrl);
+        }
+      }).catch(() => {
+        const fallbackUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
+        Linking.openURL(fallbackUrl);
+      });
+    }
   };
 
   const callCenter = (phone: string) => {
@@ -173,6 +190,19 @@ export default function MapScreen() {
                 onPress={() => focusMarker(inst)}
               />
             ))}
+
+            {/* Polyline to show route from user to selected center */}
+            {selectedCenter && userLocation && (
+              <Polyline
+                coordinates={[
+                  { latitude: userLocation.latitude, longitude: userLocation.longitude },
+                  { latitude: selectedCenter.latitude, longitude: selectedCenter.longitude }
+                ]}
+                strokeColor="#DC2626"
+                strokeWidth={4}
+                lineDashPattern={[10, 5]}
+              />
+            )}
           </MapView>
         )}
 
