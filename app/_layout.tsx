@@ -14,6 +14,8 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { setupNotificationListeners } from "@/services/notificationService";
+import { ThemeProvider as AppThemeProvider } from "@/contexts/ThemeContext";
+import { useTheme } from "@/hooks/useTheme";
 
 export const unstable_settings = {
   anchor: "(tabs)",
@@ -21,16 +23,19 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <RootLayoutNav />
-      </NotificationProvider>
-    </AuthProvider>
+    <AppThemeProvider>
+      <AuthProvider>
+        <NotificationProvider>
+          <RootLayoutNav />
+        </NotificationProvider>
+      </AuthProvider>
+    </AppThemeProvider>
   );
 }
 
 function RootLayoutNav() {
-  const colorScheme = useColorScheme();
+  const { isDark, colors } = useTheme();
+  const colorScheme = isDark ? "dark" : "light";
   const { user, loading } = useAuth();
   const [appIsReady, setAppIsReady] = useState(false);
 
@@ -111,7 +116,7 @@ function RootLayoutNav() {
         <Stack.Screen name="settings" options={{ headerShown: false }} />
         <Stack.Screen name="compatibility" options={{ headerShown: false }} />
       </Stack>
-      <StatusBar style="dark" />
+      <StatusBar style={isDark ? "light" : "dark"} />
     </ThemeProvider>
   );
 }

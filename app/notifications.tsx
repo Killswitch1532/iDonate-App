@@ -1,5 +1,5 @@
 import { MaterialIcons, Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { 
   ScrollView, 
   StyleSheet, 
@@ -23,8 +23,11 @@ import {
   clearAllNotifications, 
   Notification 
 } from "@/services/notificationService";
+import { useTheme } from '@/hooks/useTheme';
 
 export default function NotificationsScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = useStyles(colors, isDark);
   const { user } = useAuth();
   const { unreadCount, refreshUnreadCount, resetBadgeCount } = useNotifications();
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -134,10 +137,10 @@ export default function NotificationsScreen() {
 
   const getIcon = (type: string) => {
     switch (type) {
-      case 'urgent_request': return { name: 'warning', color: '#E74C3C' };
-      case 'appointment_confirmed': return { name: 'check-circle', color: '#27AE60' };
-      case 'system_broadcast': return { name: 'campaign', color: '#4A90E2' };
-      default: return { name: 'notifications', color: '#4A90E2' };
+      case 'urgent_request': return { name: 'warning', color: colors.primary };
+      case 'appointment_confirmed': return { name: 'check-circle', color: colors.success };
+      case 'system_broadcast': return { name: 'campaign', color: colors.accent };
+      default: return { name: 'notifications', color: colors.accent };
     }
   };
 
@@ -161,7 +164,7 @@ export default function NotificationsScreen() {
           )}
         </View>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="close" size={24} color="#7F8C8D" />
+          <Ionicons name="close" size={24} color={colors.icon} />
         </TouchableOpacity>
       </View>
 
@@ -197,16 +200,16 @@ export default function NotificationsScreen() {
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#E74C3C"]} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
         }
       >
         <View style={styles.notificationsSection}>
           {loading ? (
-            <ActivityIndicator size="large" color="#E74C3C" style={{ marginTop: 50 }} />
+            <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 50 }} />
           ) : filteredNotifications.length === 0 ? (
             <View style={styles.emptyState}>
               <View style={styles.emptyIconContainer}>
-                <MaterialIcons name="notifications-none" size={72} color="#E74C3C" />
+                <MaterialIcons name="notifications-none" size={72} color={colors.primary} />
               </View>
               <ThemedText style={styles.emptyTitle}>All caught up!</ThemedText>
               <ThemedText style={styles.emptyDescription}>
@@ -260,7 +263,7 @@ export default function NotificationsScreen() {
                     onPress={handleDelete}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
-                    <MaterialIcons name="delete-outline" size={22} color="#94A3B8" />
+                    <MaterialIcons name="delete-outline" size={22} color={colors.icon} />
                   </TouchableOpacity>
                 </View>
               );
@@ -271,14 +274,14 @@ export default function NotificationsScreen() {
         {notifications.length > 0 && (
           <View style={styles.quickActions}>
             <TouchableOpacity style={styles.quickActionButton} onPress={handleMarkAllRead}>
-              <View style={[styles.quickActionIconContainer, { backgroundColor: '#EBF8FF' }]}>
-                <MaterialIcons name="done-all" size={20} color="#3182CE" />
+              <View style={[styles.quickActionIconContainer, { backgroundColor: isDark ? 'rgba(49, 130, 206, 0.1)' : '#EBF8FF' }]}>
+                <MaterialIcons name="done-all" size={20} color={isDark ? '#63B3ED' : '#3182CE'} />
               </View>
               <ThemedText style={styles.quickActionText}>Mark all as read</ThemedText>
             </TouchableOpacity>
             <TouchableOpacity style={styles.quickActionButton} onPress={handleClearAll}>
-              <View style={[styles.quickActionIconContainer, { backgroundColor: '#FFF5F5' }]}>
-                <MaterialIcons name="delete-sweep" size={20} color="#E74C3C" />
+              <View style={[styles.quickActionIconContainer, { backgroundColor: isDark ? 'rgba(231, 76, 60, 0.1)' : '#FFF5F5' }]}>
+                <MaterialIcons name="delete-sweep" size={20} color={colors.primary} />
               </View>
               <ThemedText style={styles.quickActionText}>Clear all notifications</ThemedText>
             </TouchableOpacity>
@@ -289,10 +292,10 @@ export default function NotificationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F5F7FA",
+    backgroundColor: colors.background,
   },
   container: {
     flex: 1,
@@ -307,13 +310,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 24,
     paddingVertical: 20,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 0,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
   },
   headerTitleRow: {
     flexDirection: "row",
@@ -322,40 +321,36 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 26,
     fontWeight: "800",
-    color: "#1A202C",
+    color: colors.textPrimary,
   },
   countBadge: {
-    backgroundColor: "#E74C3C",
+    backgroundColor: colors.primary,
     borderRadius: 16,
     paddingHorizontal: 10,
     paddingVertical: 4,
     marginLeft: 12,
-    shadowColor: "#E74C3C",
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: isDark ? 0.3 : 0.2,
     shadowRadius: 6,
     elevation: 3,
   },
   countBadgeText: {
-    color: "#FFFFFF",
+    color: colors.surface,
     fontSize: 13,
     fontWeight: "800",
   },
   backBtn: {
     padding: 8,
-    backgroundColor: "#F8F9FA",
+    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : "#F8F9FA",
     borderRadius: 12,
   },
   filtersSection: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     paddingVertical: 16,
     paddingTop: 24,
-    borderBottomWidth: 0,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
-    elevation: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
   },
   filtersContainer: {
     paddingHorizontal: 24,
@@ -364,49 +359,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 24,
-    backgroundColor: "#F0F2F5",
+    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : "#F0F2F5",
     marginRight: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
-    shadowRadius: 2,
-    elevation: 1,
   },
   selectedFilterButton: {
-    backgroundColor: "#E74C3C",
-    shadowColor: "#E74C3C",
-    shadowOpacity: 0.2,
+    backgroundColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOpacity: isDark ? 0.3 : 0.2,
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 8,
     elevation: 4,
   },
   filterText: {
     fontSize: 15,
-    color: "#64748B",
+    color: colors.textSecondary,
     fontWeight: "700",
   },
   selectedFilterText: {
-    color: "#FFFFFF",
+    color: colors.surface,
   },
   notificationsSection: {
     marginBottom: 24,
   },
   notificationCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 20,
     padding: 20,
     marginBottom: 16,
-    shadowColor: "#000",
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
+    shadowOpacity: isDark ? 0.3 : 0.05,
     shadowRadius: 12,
     elevation: 5,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   unreadCard: {
-    backgroundColor: "#FFF5F5",
-    borderLeftWidth: 0,
-    borderWidth: 1,
-    borderColor: "#FECACA",
+    backgroundColor: isDark ? 'rgba(231, 76, 60, 0.1)' : "#FFF5F5",
+    borderColor: isDark ? 'rgba(231, 76, 60, 0.3)' : "#FECACA",
   },
   notificationContent: {
     flexDirection: "row",
@@ -426,9 +416,9 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: isDark ? 0.3 : 0.05,
     shadowRadius: 4,
     elevation: 3,
   },
@@ -439,10 +429,10 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: "#E74C3C",
+    backgroundColor: colors.primary,
     borderWidth: 3,
-    borderColor: "#FFFFFF",
-    shadowColor: "#E74C3C",
+    borderColor: colors.card,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.4,
     shadowRadius: 3,
@@ -460,21 +450,21 @@ const styles = StyleSheet.create({
   notificationTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#1A202C",
+    color: colors.textPrimary,
     flex: 1,
     marginRight: 12,
   },
   unreadTitle: {
-    color: "#C53030",
+    color: colors.primary,
   },
   notificationTime: {
     fontSize: 12,
-    color: "#A0AEC0",
+    color: colors.textSecondary,
     fontWeight: "600",
   },
   notificationMessage: {
     fontSize: 14,
-    color: "#4A5568",
+    color: colors.textSecondary,
     lineHeight: 20,
     fontWeight: "500",
   },
@@ -487,24 +477,24 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: "#FFF5F5",
+    backgroundColor: isDark ? 'rgba(231, 76, 60, 0.1)' : "#FFF5F5",
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#E74C3C",
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: isDark ? 0.3 : 0.1,
     shadowRadius: 12,
     elevation: 6,
   },
   emptyTitle: {
     fontSize: 22,
     fontWeight: "800",
-    color: "#1A202C",
+    color: colors.textPrimary,
     marginTop: 24,
   },
   emptyDescription: {
     fontSize: 15,
-    color: "#718096",
+    color: colors.textSecondary,
     textAlign: "center",
     marginTop: 12,
     paddingHorizontal: 48,
@@ -519,14 +509,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-start",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     paddingVertical: 16,
     paddingHorizontal: 20,
     borderRadius: 16,
-    borderWidth: 0,
-    shadowColor: "#000",
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
+    shadowOpacity: isDark ? 0.3 : 0.04,
     shadowRadius: 8,
     elevation: 3,
   },
@@ -541,7 +532,7 @@ const styles = StyleSheet.create({
   quickActionText: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#4A5568",
+    color: colors.textPrimary,
   },
-});
+}), [colors, isDark]);
 

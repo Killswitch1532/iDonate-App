@@ -1,12 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { ThemedText } from '@/components/themed-text';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { Notification } from '@/services/notificationService';
+import { useTheme } from '@/hooks/useTheme';
 
 export default function NotificationDetailScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = useStyles(colors, isDark);
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const [notification, setNotification] = useState<Notification | null>(null);
@@ -47,12 +50,12 @@ export default function NotificationDetailScreen() {
   const getIcon = (type: string) => {
     switch (type) {
       case 'urgent_request':
-        return { name: 'warning', color: '#E74C3C' };
+        return { name: 'warning', color: colors.primary };
       case 'appointment_confirmed':
-        return { name: 'check-circle', color: '#27AE60' };
+        return { name: 'check-circle', color: colors.success };
       case 'system_broadcast':
       default:
-        return { name: 'notifications', color: '#4A90E2' };
+        return { name: 'notifications', color: colors.accent };
     }
   };
 
@@ -83,7 +86,7 @@ export default function NotificationDetailScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#DC2626" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -109,7 +112,7 @@ export default function NotificationDetailScreen() {
       {/* Message Card */}
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <Ionicons name="chatbox-outline" size={20} color="#64748B" />
+          <Ionicons name="chatbox-outline" size={20} color={colors.icon} />
           <Text style={styles.cardTitle}>Message</Text>
         </View>
         <Text style={styles.message}>{notification.message}</Text>
@@ -119,7 +122,7 @@ export default function NotificationDetailScreen() {
       {notification.data?.audience && (
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Ionicons name="people-outline" size={20} color="#64748B" />
+            <Ionicons name="people-outline" size={20} color={colors.icon} />
             <Text style={styles.cardTitle}>Audience</Text>
           </View>
           <Text style={styles.infoText}>
@@ -131,7 +134,7 @@ export default function NotificationDetailScreen() {
       {/* Action Button */}
       {notification.data?.requestId && (
         <TouchableOpacity style={styles.actionButton} onPress={handleGoToRequest}>
-          <Ionicons name="eye-outline" size={20} color="#fff" />
+          <Ionicons name="eye-outline" size={20} color={colors.surface} />
           <Text style={styles.actionButtonText}>View Blood Request</Text>
         </TouchableOpacity>
       )}
@@ -139,10 +142,10 @@ export default function NotificationDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
   },
   content: {
     padding: 20,
@@ -154,17 +157,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 20,
     padding: 24,
     marginBottom: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
+    shadowOpacity: isDark ? 0.3 : 0.08,
     shadowRadius: 16,
     elevation: 5,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   iconCircle: {
     width: 64,
@@ -180,24 +185,26 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#1A202C',
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   time: {
     fontSize: 14,
-    color: '#94A3B8',
+    color: colors.textSecondary,
     fontWeight: '600',
   },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     padding: 20,
     borderRadius: 16,
     marginBottom: 16,
-    shadowColor: '#000',
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
+    shadowOpacity: isDark ? 0.3 : 0.04,
     shadowRadius: 8,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -207,22 +214,22 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#64748B',
+    color: colors.textSecondary,
     marginLeft: 8,
     textTransform: 'uppercase',
   },
   message: {
     fontSize: 16,
-    color: '#1E293B',
+    color: colors.textPrimary,
     lineHeight: 24,
   },
   infoText: {
     fontSize: 15,
-    color: '#475569',
+    color: colors.textSecondary,
     lineHeight: 22,
   },
   actionButton: {
-    backgroundColor: '#DC2626',
+    backgroundColor: colors.primary,
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -232,8 +239,8 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   actionButtonText: {
-    color: '#fff',
+    color: colors.surface,
     fontSize: 16,
     fontWeight: '700',
   },
-});
+}), [colors, isDark]);

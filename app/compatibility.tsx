@@ -1,6 +1,6 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
     ScrollView,
     StyleSheet,
@@ -11,8 +11,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
+import { useTheme } from '@/hooks/useTheme';
 
 export default function CompatibilityScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = useStyles(colors, isDark);
   const [selectedBloodType, setSelectedBloodType] = useState<string>("");
   const [showMatrix, setShowMatrix] = useState<boolean>(false);
 
@@ -191,7 +194,7 @@ export default function CompatibilityScreen() {
                     <MaterialIcons
                       name={canDonate ? "check" : "close"}
                       size={12}
-                      color={canDonate ? "#27AE60" : "#E74C3C"}
+                      color={canDonate ? colors.success : colors.primary}
                       style={styles.matrixCellText}
                     />
                   </View>
@@ -227,14 +230,14 @@ export default function CompatibilityScreen() {
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <MaterialIcons name="arrow-back" size={24} color="#2C3E50" />
+            <MaterialIcons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <View style={styles.logoContainer}>
               <MaterialIcons
                 name="favorite"
                 size={24}
-                color="#E74C3C"
+                color={colors.primary}
                 style={styles.heartIcon}
               />
               <ThemedText type="logo" style={styles.logoText}>
@@ -311,7 +314,7 @@ export default function CompatibilityScreen() {
             <MaterialIcons
               name="water-drop"
               size={24}
-              color="#E74C3C"
+              color={colors.primary}
               style={styles.factIcon}
             />
             <View style={styles.factContent}>
@@ -327,7 +330,7 @@ export default function CompatibilityScreen() {
             <MaterialIcons
               name="favorite"
               size={24}
-              color="#E74C3C"
+              color={colors.primary}
               style={styles.factIcon}
             />
             <View style={styles.factContent}>
@@ -343,7 +346,7 @@ export default function CompatibilityScreen() {
             <MaterialIcons
               name="flash-on"
               size={24}
-              color="#F39C12"
+              color={colors.warning}
               style={styles.factIcon}
             />
             <View style={styles.factContent}>
@@ -359,7 +362,7 @@ export default function CompatibilityScreen() {
             <MaterialIcons
               name="schedule"
               size={24}
-              color="#3498DB"
+              color={colors.accent}
               style={styles.factIcon}
             />
             <View style={styles.factContent}>
@@ -375,7 +378,7 @@ export default function CompatibilityScreen() {
             <MaterialIcons
               name="science"
               size={24}
-              color="#8E44AD"
+              color={colors.accent}
               style={styles.factIcon}
             />
             <View style={styles.factContent}>
@@ -391,7 +394,7 @@ export default function CompatibilityScreen() {
             <MaterialIcons
               name="group"
               size={24}
-              color="#27AE60"
+              color={colors.success}
               style={styles.factIcon}
             />
             <View style={styles.factContent}>
@@ -407,7 +410,7 @@ export default function CompatibilityScreen() {
             <MaterialIcons
               name="local-hospital"
               size={24}
-              color="#E67E22"
+              color={colors.warning}
               style={styles.factIcon}
             />
             <View style={styles.factContent}>
@@ -423,7 +426,7 @@ export default function CompatibilityScreen() {
             <MaterialIcons
               name="pregnant-woman"
               size={24}
-              color="#E91E63"
+              color={colors.primary}
               style={styles.factIcon}
             />
             <View style={styles.factContent}>
@@ -439,7 +442,7 @@ export default function CompatibilityScreen() {
             <MaterialIcons
               name="fitness-center"
               size={24}
-              color="#795548"
+              color={colors.textSecondary}
               style={styles.factIcon}
             />
             <View style={styles.factContent}>
@@ -455,7 +458,7 @@ export default function CompatibilityScreen() {
             <MaterialIcons
               name="security"
               size={24}
-              color="#607D8B"
+              color={colors.icon}
               style={styles.factIcon}
             />
             <View style={styles.factContent}>
@@ -471,7 +474,7 @@ export default function CompatibilityScreen() {
             <MaterialIcons
               name="trending-up"
               size={24}
-              color="#FF5722"
+              color={colors.primary}
               style={styles.factIcon}
             />
             <View style={styles.factContent}>
@@ -487,7 +490,7 @@ export default function CompatibilityScreen() {
             <MaterialIcons
               name="history-edu"
               size={24}
-              color="#3F51B5"
+              color={colors.accent}
               style={styles.factIcon}
             />
             <View style={styles.factContent}>
@@ -507,14 +510,14 @@ export default function CompatibilityScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F8F4F4",
+    backgroundColor: colors.background,
   },
   container: {
     flex: 1,
-    backgroundColor: "#F8F4F4",
+    backgroundColor: colors.background,
   },
   contentContainer: {
     padding: 16,
@@ -545,11 +548,11 @@ const styles = StyleSheet.create({
     fontSize: 28,
     lineHeight: 34,
     fontWeight: "bold",
-    color: "#2C3E50",
+    color: colors.textPrimary,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: "#7F8C8D",
+    color: colors.textSecondary,
   },
 
   // Title Section
@@ -559,13 +562,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#2C3E50",
+    color: colors.textPrimary,
     marginBottom: 8,
     textAlign: "center",
   },
   subtitle: {
     fontSize: 16,
-    color: "#7F8C8D",
+    color: colors.textSecondary,
     textAlign: "center",
     lineHeight: 22,
   },
@@ -578,25 +581,27 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: 16,
     alignItems: "center",
-    shadowColor: "#000",
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: isDark ? 0.3 : 0.05,
     shadowRadius: 4,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   statNumber: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#E74C3C",
+    color: colors.primary,
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
-    color: "#7F8C8D",
+    color: colors.textSecondary,
     textAlign: "center",
   },
 
@@ -607,12 +612,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#2C3E50",
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   sectionSubtitle: {
     fontSize: 14,
-    color: "#7F8C8D",
+    color: colors.textSecondary,
     marginBottom: 16,
   },
   bloodTypesGrid: {
@@ -621,9 +626,9 @@ const styles = StyleSheet.create({
   bloodTypeCard: {
     borderRadius: 16,
     padding: 16,
-    shadowColor: "#000",
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: isDark ? 0.3 : 0.1,
     shadowRadius: 8,
     elevation: 4,
   },
@@ -682,45 +687,49 @@ const styles = StyleSheet.create({
 
   // Matrix Toggle
   matrixToggle: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: 16,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 16,
-    shadowColor: "#000",
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: isDark ? 0.3 : 0.05,
     shadowRadius: 4,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   matrixToggleText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#2C3E50",
+    color: colors.textPrimary,
   },
   matrixToggleIcon: {
     fontSize: 16,
-    color: "#7F8C8D",
+    color: colors.icon,
   },
 
   // Matrix
   matrixContainer: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 24,
-    shadowColor: "#000",
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: isDark ? 0.3 : 0.05,
     shadowRadius: 4,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   matrixTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#2C3E50",
+    color: colors.textPrimary,
     marginBottom: 16,
     textAlign: "center",
   },
@@ -734,7 +743,7 @@ const styles = StyleSheet.create({
   matrixHeaderText: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#7F8C8D",
+    color: colors.textSecondary,
     flex: 1,
     textAlign: "center",
   },
@@ -758,10 +767,10 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   compatibleCell: {
-    backgroundColor: "#D5F4E6",
+    backgroundColor: isDark ? "rgba(39, 174, 96, 0.2)" : "#D5F4E6",
   },
   incompatibleCell: {
-    backgroundColor: "#FADBD8",
+    backgroundColor: isDark ? "rgba(231, 76, 60, 0.2)" : "#FADBD8",
   },
   matrixCellText: {
     // Icon styling handled by MaterialIcons component
@@ -783,7 +792,7 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 12,
-    color: "#7F8C8D",
+    color: colors.textSecondary,
   },
 
   // Education Section
@@ -791,17 +800,19 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   factCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: 16,
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 12,
-    shadowColor: "#000",
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: isDark ? 0.3 : 0.05,
     shadowRadius: 4,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   factIcon: {
     marginRight: 12,
@@ -812,17 +823,16 @@ const styles = StyleSheet.create({
   factTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#2C3E50",
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   factDescription: {
     fontSize: 14,
-    color: "#7F8C8D",
+    color: colors.textSecondary,
     lineHeight: 20,
   },
 
-  // Bottom spacer
   bottomSpacer: {
     height: 20,
   },
-});
+}), [colors, isDark]);

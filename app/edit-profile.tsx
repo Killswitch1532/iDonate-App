@@ -1,6 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -21,11 +21,14 @@ import {
   updateProfile,
   upsertDonorProfile,
 } from '@/services/donorService';
+import { useTheme } from '@/hooks/useTheme';
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const GENOTYPES = ['AA', 'AS', 'SS', 'AC', 'SC'];
 
 export default function EditProfileScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = useStyles(colors, isDark);
   const { user, profile, refreshProfile } = useAuth();
 
   // Form state
@@ -117,7 +120,7 @@ export default function EditProfileScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#E74C3C" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </SafeAreaView>
     );
@@ -140,7 +143,7 @@ export default function EditProfileScreen() {
               style={styles.backButton}
               onPress={() => router.back()}
             >
-              <MaterialIcons name="arrow-back" size={24} color="#2C3E50" />
+              <MaterialIcons name="arrow-back" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
             <ThemedText style={styles.headerTitle}>Edit Profile</ThemedText>
             <TouchableOpacity
@@ -149,7 +152,7 @@ export default function EditProfileScreen() {
               disabled={saving}
             >
               {saving ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
+                <ActivityIndicator size="small" color={colors.surface} />
               ) : (
                 <ThemedText style={styles.saveButtonText}>Save</ThemedText>
               )}
@@ -159,7 +162,7 @@ export default function EditProfileScreen() {
           {/* Personal Info Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <MaterialIcons name="person" size={20} color="#4A90E2" />
+              <MaterialIcons name="person" size={20} color={colors.accent} />
               <ThemedText style={styles.sectionTitle}>
                 Personal Information
               </ThemedText>
@@ -172,7 +175,7 @@ export default function EditProfileScreen() {
                 value={fullName}
                 onChangeText={setFullName}
                 placeholder="Enter your full name"
-                placeholderTextColor="#BDC3C7"
+                placeholderTextColor={colors.textSecondary}
               />
             </View>
 
@@ -183,7 +186,7 @@ export default function EditProfileScreen() {
                 value={phone}
                 onChangeText={setPhone}
                 placeholder="Enter your phone number"
-                placeholderTextColor="#BDC3C7"
+                placeholderTextColor={colors.textSecondary}
                 keyboardType="phone-pad"
               />
             </View>
@@ -194,7 +197,7 @@ export default function EditProfileScreen() {
                 <ThemedText style={styles.readOnlyText}>
                   {user?.email || 'Not set'}
                 </ThemedText>
-                <MaterialIcons name="lock" size={16} color="#BDC3C7" />
+                <MaterialIcons name="lock" size={16} color={colors.textSecondary} />
               </View>
               <ThemedText style={styles.helperText}>
                 Email cannot be changed here
@@ -205,7 +208,7 @@ export default function EditProfileScreen() {
           {/* Health & Donation Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <MaterialIcons name="favorite" size={20} color="#E74C3C" />
+              <MaterialIcons name="favorite" size={20} color={colors.primary} />
               <ThemedText style={styles.sectionTitle}>
                 Health & Donation
               </ThemedText>
@@ -268,7 +271,7 @@ export default function EditProfileScreen() {
                 value={weight}
                 onChangeText={setWeight}
                 placeholder="e.g. 70"
-                placeholderTextColor="#BDC3C7"
+                placeholderTextColor={colors.textSecondary}
                 keyboardType="numeric"
               />
             </View>
@@ -280,7 +283,7 @@ export default function EditProfileScreen() {
                 value={birthDate}
                 onChangeText={setBirthDate}
                 placeholder="YYYY-MM-DD"
-                placeholderTextColor="#BDC3C7"
+                placeholderTextColor={colors.textSecondary}
               />
               <ThemedText style={styles.helperText}>
                 Format: YYYY-MM-DD (e.g. 1995-06-15)
@@ -291,7 +294,7 @@ export default function EditProfileScreen() {
           {/* Address Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <MaterialIcons name="location-on" size={20} color="#27AE60" />
+              <MaterialIcons name="location-on" size={20} color={colors.success} />
               <ThemedText style={styles.sectionTitle}>Address</ThemedText>
             </View>
 
@@ -302,7 +305,7 @@ export default function EditProfileScreen() {
                 value={address}
                 onChangeText={setAddress}
                 placeholder="Enter your address"
-                placeholderTextColor="#BDC3C7"
+                placeholderTextColor={colors.textSecondary}
                 multiline
                 numberOfLines={3}
               />
@@ -316,10 +319,10 @@ export default function EditProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: colors.background,
   },
   loadingContainer: {
     flex: 1,
@@ -345,22 +348,24 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: isDark ? 0.3 : 0.08,
     shadowRadius: 4,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#2C3E50',
+    color: colors.textPrimary,
   },
   saveButton: {
-    backgroundColor: '#E74C3C',
+    backgroundColor: colors.primary,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
@@ -371,22 +376,24 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   saveButtonText: {
-    color: '#FFFFFF',
+    color: colors.surface,
     fontSize: 15,
     fontWeight: '700',
   },
 
   // Sections
   section: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     borderRadius: 20,
     padding: 20,
     marginBottom: 16,
-    shadowColor: '#000',
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
+    shadowOpacity: isDark ? 0.3 : 0.06,
     shadowRadius: 12,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -397,7 +404,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#2C3E50',
+    color: colors.textPrimary,
   },
 
   // Fields
@@ -407,20 +414,20 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#7F8C8D',
+    color: colors.textSecondary,
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   input: {
     borderWidth: 1.5,
-    borderColor: '#E8ECEF',
+    borderColor: colors.borderLight,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
-    color: '#2C3E50',
-    backgroundColor: '#FAFBFC',
+    color: colors.textPrimary,
+    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : '#FAFBFC',
   },
   multilineInput: {
     minHeight: 80,
@@ -431,19 +438,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1.5,
-    borderColor: '#E8ECEF',
+    borderColor: colors.borderLight,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: '#F0F2F4',
+    backgroundColor: isDark ? 'rgba(0, 0, 0, 0.2)' : '#F0F2F4',
   },
   readOnlyText: {
     fontSize: 16,
-    color: '#95A5A6',
+    color: colors.textSecondary,
   },
   helperText: {
     fontSize: 12,
-    color: '#BDC3C7',
+    color: colors.textSecondary,
     marginTop: 6,
   },
 
@@ -458,25 +465,25 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#E8ECEF',
-    backgroundColor: '#FAFBFC',
+    borderColor: colors.borderLight,
+    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : '#FAFBFC',
     minWidth: 60,
     alignItems: 'center',
   },
   bloodTypeChipSelected: {
-    borderColor: '#E74C3C',
-    backgroundColor: '#FEF0F0',
+    borderColor: colors.primary,
+    backgroundColor: isDark ? 'rgba(231, 76, 60, 0.15)' : '#FEF0F0',
   },
   bloodTypeText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#7F8C8D',
+    color: colors.textSecondary,
   },
   bloodTypeTextSelected: {
-    color: '#E74C3C',
+    color: colors.primary,
   },
 
   bottomSpacer: {
     height: 40,
   },
-});
+}), [colors, isDark]);

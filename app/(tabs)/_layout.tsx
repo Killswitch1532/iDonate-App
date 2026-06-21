@@ -4,24 +4,24 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { StatusBar } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTheme } from '@/hooks/useTheme';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const { colors, isDark } = useTheme();
   const segments = useSegments() as string[];
   const isProfile = segments.includes('profile');
 
   return (
     <>
       <StatusBar 
-        barStyle={isProfile ? 'light-content' : 'dark-content'} 
-        backgroundColor={isProfile ? '#E74C3C' : 'transparent'} 
+        barStyle={isProfile ? 'light-content' : colors.statusBarStyle} 
+        backgroundColor={isProfile ? colors.primary : 'transparent'} 
         translucent 
       />
       <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#E74C3C',
-        tabBarInactiveTintColor: '#9AA4AB',
+        tabBarActiveTintColor: colors.tabBarActive,
+        tabBarInactiveTintColor: colors.tabBarInactive,
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarStyle: {
@@ -30,11 +30,11 @@ export default function TabLayout() {
           right: 0,
           bottom: 0,
           height: 80,
-          backgroundColor: '#FFFFFF',
+          backgroundColor: colors.tabBarBackground,
           borderTopWidth: 1,
-          borderTopColor: '#F0F0F0',
-          shadowColor: '#000',
-          shadowOpacity: 0.08,
+          borderTopColor: colors.tabBarBorder,
+          shadowColor: colors.shadowColor,
+          shadowOpacity: isDark ? 0.2 : 0.08,
           shadowOffset: { width: 0, height: -3 },
           shadowRadius: 12,
           elevation: 10,

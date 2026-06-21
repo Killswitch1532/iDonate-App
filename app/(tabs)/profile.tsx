@@ -1,6 +1,6 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -10,8 +10,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getDonorProfile, DonorProfile, getCooldownStatus } from "@/services/donorService";
 import { getDonorDonations, Donation } from "@/services/donationService";
 import { getCache, setCache } from "@/services/offlineCache";
+import { useTheme } from "@/hooks/useTheme";
 
 export default function ProfileScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = useStyles(colors, isDark);
   const { signOut, profile, user } = useAuth();
   const [donorData, setDonorData] = useState<DonorProfile | null>(null);
   const [donorLoading, setDonorLoading] = useState(true);
@@ -99,12 +102,12 @@ export default function ProfileScreen() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'scheduled': return { bg: '#E8F4FD', text: '#4A90E2' };
-      case 'confirmed': return { bg: '#FFF3CD', text: '#F39C12' };
-      case 'completed': return { bg: '#E8F5E8', text: '#27AE60' };
-      case 'cancelled': return { bg: '#FDE8E8', text: '#E74C3C' };
-      case 'no_show': return { bg: '#F0F0F0', text: '#7F8C8D' };
-      default: return { bg: '#F0F0F0', text: '#7F8C8D' };
+      case 'scheduled': return { bg: isDark ? '#1E3A8A' : '#E8F4FD', text: isDark ? '#60A5FA' : '#4A90E2' };
+      case 'confirmed': return { bg: isDark ? '#78350F' : '#FFF3CD', text: isDark ? '#FBBF24' : '#F39C12' };
+      case 'completed': return { bg: isDark ? '#14532D' : '#E8F5E8', text: isDark ? '#4ADE80' : '#27AE60' };
+      case 'cancelled': return { bg: colors.borderLight, text: colors.error };
+      case 'no_show': return { bg: colors.borderLight, text: colors.textSecondary };
+      default: return { bg: colors.borderLight, text: colors.textSecondary };
     }
   };
 
@@ -137,7 +140,7 @@ export default function ProfileScreen() {
       >
         {/* Gradient Header & Profile Section combined */}
         <LinearGradient
-          colors={['#E74C3C', '#C0392B']}
+          colors={isDark ? ['#7F1D1D', '#450a0a'] : ['#E74C3C', '#C0392B']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.gradientHeader}
@@ -155,7 +158,7 @@ export default function ProfileScreen() {
                 {avatarUrl ? (
                   <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
                 ) : (
-                  <MaterialIcons name="person" size={40} color="#E74C3C" />
+                  <MaterialIcons name="person" size={40} color={colors.primary} />
                 )}
                 <View style={styles.onlineBadge} />
               </View>
@@ -184,8 +187,8 @@ export default function ProfileScreen() {
               )}
             >
               <View style={styles.kpiIconRow}>
-                <MaterialIcons name="water-drop" size={24} color="#E74C3C" style={styles.cardIcon} />
-                <MaterialIcons name="info-outline" size={14} color="#BDC3C7" />
+                <MaterialIcons name="water-drop" size={24} color={colors.primary} style={styles.cardIcon} />
+                <MaterialIcons name="info-outline" size={14} color={colors.iconMuted} />
               </View>
               <ThemedText style={styles.donationNumber}>{completedDonationsCount > 0 ? completedDonationsCount : '—'}</ThemedText>
               <ThemedText style={styles.donationLabel}>Total Donations</ThemedText>
@@ -199,8 +202,8 @@ export default function ProfileScreen() {
               )}
             >
               <View style={styles.kpiIconRow}>
-                <MaterialIcons name="favorite" size={24} color="#E74C3C" style={styles.cardIcon} />
-                <MaterialIcons name="info-outline" size={14} color="#BDC3C7" />
+                <MaterialIcons name="favorite" size={24} color={colors.primary} style={styles.cardIcon} />
+                <MaterialIcons name="info-outline" size={14} color={colors.iconMuted} />
               </View>
               <ThemedText style={styles.livesSavedNumber}>{livesSaved > 0 ? livesSaved : '—'}</ThemedText>
               <ThemedText style={styles.livesSavedLabel}>Lives Saved</ThemedText>
@@ -214,8 +217,8 @@ export default function ProfileScreen() {
               )}
             >
               <View style={styles.kpiIconRow}>
-                <MaterialIcons name="schedule" size={24} color="#4A90E2" style={styles.cardIcon} />
-                <MaterialIcons name="info-outline" size={14} color="#BDC3C7" />
+                <MaterialIcons name="schedule" size={24} color={colors.accent} style={styles.cardIcon} />
+                <MaterialIcons name="info-outline" size={14} color={colors.iconMuted} />
               </View>
               <ThemedText style={styles.lastDonationNumber}>
                 {daysSinceLastDonation !== null ? daysSinceLastDonation : '—'}
@@ -232,7 +235,7 @@ export default function ProfileScreen() {
               <MaterialIcons
                 name="person"
                 size={20}
-                color="#4A90E2"
+                color={colors.accent}
                 style={styles.cardIcon}
               />
               <ThemedText style={styles.cardTitle}>
@@ -246,7 +249,7 @@ export default function ProfileScreen() {
                   <MaterialIcons
                     name="phone"
                     size={20}
-                    color="#7F8C8D"
+                    color={colors.icon}
                     style={styles.infoIcon}
                   />
                   <View style={styles.infoTextContainer}>
@@ -259,7 +262,7 @@ export default function ProfileScreen() {
                 <MaterialIcons
                   name="chevron-right"
                   size={20}
-                  color="#7F8C8D"
+                  color={colors.icon}
                   style={styles.arrowIcon}
                 />
               </TouchableOpacity>
@@ -269,7 +272,7 @@ export default function ProfileScreen() {
                   <MaterialIcons
                     name="email"
                     size={20}
-                    color="#7F8C8D"
+                    color={colors.icon}
                     style={styles.infoIcon}
                   />
                   <View style={styles.infoTextContainer}>
@@ -282,7 +285,7 @@ export default function ProfileScreen() {
                 <MaterialIcons
                   name="chevron-right"
                   size={20}
-                  color="#7F8C8D"
+                  color={colors.icon}
                   style={styles.arrowIcon}
                 />
               </TouchableOpacity>
@@ -292,7 +295,7 @@ export default function ProfileScreen() {
                   <MaterialIcons
                     name="location-on"
                     size={20}
-                    color="#7F8C8D"
+                    color={colors.icon}
                     style={styles.infoIcon}
                   />
                   <View style={styles.infoTextContainer}>
@@ -305,7 +308,7 @@ export default function ProfileScreen() {
                 <MaterialIcons
                   name="chevron-right"
                   size={20}
-                  color="#7F8C8D"
+                  color={colors.icon}
                   style={styles.arrowIcon}
                 />
               </TouchableOpacity>
@@ -322,13 +325,13 @@ export default function ProfileScreen() {
                 <MaterialIcons 
                   name={cooldown.isEligible ? "check-circle" : "hourglass-empty"} 
                   size={24} 
-                  color={cooldown.isEligible ? "#16A34A" : "#D97706"} 
+                  color={cooldown.isEligible ? colors.success : colors.warning} 
                 />
                 <View style={{ flex: 1 }}>
-                  <ThemedText style={[styles.eligibilityTitle, { color: cooldown.isEligible ? '#166534' : '#92400E' }]}>
+                  <ThemedText style={[styles.eligibilityTitle, { color: cooldown.isEligible ? (isDark ? '#4ADE80' : '#166534') : (isDark ? '#FBBF24' : '#92400E') }]}>
                     {cooldown.isEligible ? 'Eligible to Donate' : 'Donation Cooldown'}
                   </ThemedText>
-                  <ThemedText style={[styles.eligibilitySubtext, { color: cooldown.isEligible ? '#15803D' : '#A16207' }]}>
+                  <ThemedText style={[styles.eligibilitySubtext, { color: cooldown.isEligible ? (isDark ? '#86EFAC' : '#15803D') : (isDark ? '#FDE68A' : '#A16207') }]}>
                     {cooldown.isEligible 
                       ? 'Based on platform rules, you are currently eligible to donate blood.'
                       : `Eligible again on ${cooldown.nextEligibleDate?.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })} (${cooldown.daysRemaining} days)`
@@ -348,7 +351,7 @@ export default function ProfileScreen() {
                 <MaterialIcons
                   name="history"
                   size={20}
-                  color="#4A90E2"
+                  color={colors.accent}
                   style={styles.cardIcon}
                 />
                 <ThemedText style={styles.cardTitle}>Recent Donations</ThemedText>
@@ -363,14 +366,14 @@ export default function ProfileScreen() {
             <View style={styles.historyItems}>
               {donationsLoading ? (
                 <View style={styles.emptyHistory}>
-                  <ActivityIndicator size="large" color="#4A90E2" />
+                  <ActivityIndicator size="large" color={colors.primary} />
                 </View>
               ) : donations.length === 0 ? (
                 <View style={styles.emptyHistory}>
                   <MaterialIcons
                     name="volunteer-activism"
                     size={40}
-                    color="#BDC3C7"
+                    color={colors.iconMuted}
                   />
                   <ThemedText style={styles.emptyHistoryText}>
                     No donation history yet
@@ -418,7 +421,7 @@ export default function ProfileScreen() {
                 <MaterialIcons
                   name="security"
                   size={24}
-                  color="#4A90E2"
+                  color={colors.accent}
                   style={styles.shieldIcon}
                 />
                 <MaterialIcons
@@ -448,13 +451,13 @@ export default function ProfileScreen() {
           >
             <View style={styles.anonymousContent}>
               <View style={styles.shieldContainer}>
-                <MaterialIcons name="bloodtype" size={24} color="#E74C3C" />
+                <MaterialIcons name="bloodtype" size={24} color={colors.primary} />
               </View>
               <View style={styles.anonymousText}>
                 <ThemedText style={styles.anonymousTitle}>My Blood Requests</ThemedText>
                 <ThemedText style={styles.anonymousDescription}>Track donations people made to you</ThemedText>
               </View>
-              <MaterialIcons name="chevron-right" size={24} color="#BDC3C7" />
+              <MaterialIcons name="chevron-right" size={24} color={colors.iconMuted} />
             </View>
           </TouchableOpacity>
         </View>
@@ -467,13 +470,13 @@ export default function ProfileScreen() {
           >
             <View style={styles.anonymousContent}>
               <View style={styles.shieldContainer}>
-                <MaterialIcons name="favorite" size={24} color="#E74C3C" />
+                <MaterialIcons name="favorite" size={24} color={colors.primary} />
               </View>
               <View style={styles.anonymousText}>
                 <ThemedText style={styles.anonymousTitle}>Blood Compatibility Guide</ThemedText>
                 <ThemedText style={styles.anonymousDescription}>Check blood type compatibility & facts</ThemedText>
               </View>
-              <MaterialIcons name="chevron-right" size={24} color="#BDC3C7" />
+              <MaterialIcons name="chevron-right" size={24} color={colors.iconMuted} />
             </View>
           </TouchableOpacity>
         </View>
@@ -484,14 +487,14 @@ export default function ProfileScreen() {
             style={styles.settingsButton}
             onPress={() => router.push("/settings")}
           >
-            <MaterialIcons name="settings" size={20} color="#4A90E2" />
+            <MaterialIcons name="settings" size={20} color={colors.accent} />
             <ThemedText style={styles.settingsText}>Settings</ThemedText>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.logoutButton}
             onPress={handleLogout}
           >
-            <MaterialIcons name="logout" size={20} color="#FFFFFF" />
+            <MaterialIcons name="logout" size={20} color={colors.primary} />
             <ThemedText style={styles.logoutText}>Log out</ThemedText>
           </TouchableOpacity>
         </View>
@@ -505,10 +508,10 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.create({
   mainContainer: {
     flex: 1,
-    backgroundColor: "#F8F9FA",
+    backgroundColor: colors.background,
   },
   container: {
     flex: 1,
@@ -609,43 +612,49 @@ const styles = StyleSheet.create({
   },
   donationCard: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 20,
     padding: 16,
     alignItems: "center",
-    shadowColor: "#000",
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
+    shadowOpacity: isDark ? 0.2 : 0.08,
     shadowRadius: 16,
     elevation: 4,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   livesSavedCard: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 20,
     padding: 16,
     alignItems: "center",
-    shadowColor: "#000",
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
+    shadowOpacity: isDark ? 0.2 : 0.08,
     shadowRadius: 16,
     elevation: 4,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   lastDonationCard: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 20,
     padding: 16,
     alignItems: "center",
-    shadowColor: "#000",
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
+    shadowOpacity: isDark ? 0.2 : 0.08,
     shadowRadius: 16,
     elevation: 4,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   cardIcon: {
     marginBottom: 12,
-    backgroundColor: '#FEF0F0',
+    backgroundColor: isDark ? colors.primaryLight + '40' : '#FEF0F0',
     padding: 8,
     borderRadius: 12,
   },
@@ -659,37 +668,37 @@ const styles = StyleSheet.create({
   donationNumber: {
     fontSize: 22,
     fontWeight: "800",
-    color: "#2C3E50",
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   donationLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: "#95A5A6",
+    color: colors.textSecondary,
     textTransform: 'uppercase',
   },
   livesSavedNumber: {
     fontSize: 22,
     fontWeight: "800",
-    color: "#2C3E50",
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   livesSavedLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: "#95A5A6",
+    color: colors.textSecondary,
     textTransform: 'uppercase',
   },
   lastDonationNumber: {
     fontSize: 22,
     fontWeight: "800",
-    color: "#2C3E50",
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   lastDonationLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: "#95A5A6",
+    color: colors.textSecondary,
     textTransform: 'uppercase',
   },
 
@@ -698,14 +707,16 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   personalInfoCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 20,
     padding: 20,
-    shadowColor: "#000",
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.05,
+    shadowOpacity: isDark ? 0.2 : 0.05,
     shadowRadius: 16,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   cardHeader: {
     flexDirection: "row",
@@ -716,7 +727,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#2C3E50",
+    color: colors.textPrimary,
   },
   infoItems: {
     gap: 20,
@@ -733,7 +744,7 @@ const styles = StyleSheet.create({
   },
   infoIcon: {
     marginRight: 16,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: colors.background,
     padding: 10,
     borderRadius: 12,
   },
@@ -743,13 +754,13 @@ const styles = StyleSheet.create({
   infoLabel: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#95A5A6",
+    color: colors.textSecondary,
     marginBottom: 4,
   },
   infoValue: {
     fontSize: 16,
     fontWeight: '500',
-    color: "#2C3E50",
+    color: colors.textPrimary,
   },
   arrowIcon: {
     // Icon styling handled by MaterialIcons component
@@ -760,14 +771,16 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   historyCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 20,
     padding: 20,
-    shadowColor: "#000",
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.05,
+    shadowOpacity: isDark ? 0.2 : 0.05,
     shadowRadius: 16,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   cardHeaderRow: {
     flexDirection: "row",
@@ -781,7 +794,7 @@ const styles = StyleSheet.create({
   },
   viewAllText: {
     fontSize: 14,
-    color: "#4A90E2",
+    color: colors.primary,
     fontWeight: "700",
   },
   historyItems: {
@@ -793,7 +806,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F8F9FA',
+    borderBottomColor: colors.divider,
   },
   historyItemContent: {
     flexDirection: "row",
@@ -809,12 +822,12 @@ const styles = StyleSheet.create({
   historyLabel: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#2C3E50",
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   historyValue: {
     fontSize: 13,
-    color: "#95A5A6",
+    color: colors.textSecondary,
   },
   historyStatus: {
     fontSize: 12,
@@ -829,11 +842,11 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   anonymousCard: {
-    backgroundColor: "#F4F6F8",
+    backgroundColor: colors.card,
     borderRadius: 20,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#E8ECEF',
+    borderColor: colors.borderLight,
   },
   anonymousContent: {
     flexDirection: "row",
@@ -842,14 +855,16 @@ const styles = StyleSheet.create({
   shieldContainer: {
     position: "relative",
     marginRight: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     padding: 10,
     borderRadius: 12,
-    shadowColor: "#000",
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: isDark ? 0.2 : 0.05,
     shadowRadius: 4,
     elevation: 1,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   shieldIcon: {
     // Icon styling handled by MaterialIcons component
@@ -873,12 +888,12 @@ const styles = StyleSheet.create({
   anonymousTitle: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#2C3E50",
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   anonymousDescription: {
     fontSize: 14,
-    color: "#7F8C8D",
+    color: colors.textSecondary,
   },
 
   // Bottom Buttons
@@ -889,7 +904,7 @@ const styles = StyleSheet.create({
   },
   settingsButton: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderRadius: 16,
     paddingVertical: 16,
     flexDirection: "row",
@@ -897,7 +912,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     borderWidth: 1,
-    borderColor: '#E8ECEF',
+    borderColor: colors.borderLight,
   },
   settingsIcon: {
     // Icon styling handled by MaterialIcons component
@@ -905,11 +920,11 @@ const styles = StyleSheet.create({
   settingsText: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#2C3E50",
+    color: colors.textPrimary,
   },
   logoutButton: {
     flex: 1,
-    backgroundColor: "#FEF0F0",
+    backgroundColor: colors.primaryLight,
     borderRadius: 16,
     paddingVertical: 16,
     flexDirection: "row",
@@ -923,7 +938,7 @@ const styles = StyleSheet.create({
   logoutText: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#E74C3C",
+    color: colors.primary,
   },
 
   // Empty History
@@ -934,12 +949,12 @@ const styles = StyleSheet.create({
   emptyHistoryText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#7F8C8D",
+    color: colors.textSecondary,
     marginTop: 12,
   },
   emptyHistorySubtext: {
     fontSize: 13,
-    color: "#BDC3C7",
+    color: colors.textMuted,
     marginTop: 4,
   },
 
@@ -962,12 +977,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   eligibilityCardEligible: {
-    backgroundColor: '#DCFCE7',
-    borderColor: '#BBF7D0',
+    backgroundColor: isDark ? '#14532D' : '#DCFCE7',
+    borderColor: isDark ? '#166534' : '#BBF7D0',
   },
   eligibilityCardCooldown: {
-    backgroundColor: '#FEF3C7',
-    borderColor: '#FDE68A',
+    backgroundColor: isDark ? '#451A03' : '#FEF3C7',
+    borderColor: isDark ? '#78350F' : '#FDE68A',
   },
   eligibilityTitle: {
     fontSize: 15,
@@ -978,4 +993,4 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
-});
+}), [colors, isDark]);

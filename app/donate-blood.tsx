@@ -1,6 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View, ActivityIndicator, Linking, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getDonorProfile, upsertDonorProfile, getCooldownStatus } from '@/services/donorService';
 import { Institution, getNearbyInstitutions } from '@/services/institutionService';
 import { bookDonation, getAvailableSlots } from '@/services/donationService';
+import { useTheme } from '@/hooks/useTheme';
 
 // react-native-maps requires a dev build — gracefully degrade in Expo Go
 let MapView: any = null;
@@ -32,6 +33,8 @@ try {
 const GOOGLE_MAPS_APIKEY = Constants.expoConfig?.android?.config?.googleMaps?.apiKey || '';
 
 export default function DonateBloodScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = useStyles(colors, isDark);
   const { user } = useAuth();
   const [selectedBloodType, setSelectedBloodType] = useState<string>('');
   const [selectedRadius, setSelectedRadius] = useState<string>('10 km');
@@ -281,7 +284,7 @@ export default function DonateBloodScreen() {
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <MaterialIcons name="arrow-back" size={24} color="#2C3E50" style={styles.backIcon} />
+            <MaterialIcons name="arrow-back" size={24} color={colors.textPrimary} style={styles.backIcon} />
           </TouchableOpacity>
           <View style={styles.headerContent}>
             <ThemedText style={styles.title}>Donate Blood</ThemedText>
@@ -291,14 +294,14 @@ export default function DonateBloodScreen() {
 
         {loading && (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#E74C3C" />
+            <ActivityIndicator size="large" color={colors.primary} />
             <ThemedText style={styles.loadingText}>Loading donation opportunities...</ThemedText>
           </View>
         )}
 
         {error && (
           <View style={styles.errorContainer}>
-            <MaterialIcons name="error-outline" size={40} color="#E74C3C" />
+            <MaterialIcons name="error-outline" size={40} color={colors.primary} />
             <ThemedText style={styles.errorText}>{error}</ThemedText>
             <TouchableOpacity style={styles.retryButton} onPress={() => router.replace('/donate-blood')}>
               <ThemedText style={styles.retryButtonText}>Retry</ThemedText>
@@ -311,7 +314,7 @@ export default function DonateBloodScreen() {
             {/* Cooldown Banner */}
             {!cooldownStatus.isEligible && (
               <View style={styles.cooldownBanner}>
-                <MaterialIcons name="hourglass-empty" size={28} color="#D97706" />
+                <MaterialIcons name="hourglass-empty" size={28} color={isDark ? '#F59E0B' : '#D97706'} />
                 <View style={{ flex: 1 }}>
                   <ThemedText style={styles.cooldownTitle}>Donation Cooldown Active</ThemedText>
                   <ThemedText style={styles.cooldownText}>
@@ -327,19 +330,19 @@ export default function DonateBloodScreen() {
             {/* Donation Details Section */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <MaterialIcons name="water-drop" size={20} color="#E74C3C" style={styles.sectionIcon} />
+                <MaterialIcons name="water-drop" size={20} color={colors.primary} style={styles.sectionIcon} />
                 <ThemedText style={styles.sectionTitle}>Donation Details</ThemedText>
               </View>
 
               <View style={styles.bloodTypeBadgeRow}>
-                <MaterialIcons name="water-drop" size={20} color="#E74C3C" style={styles.sectionIcon} />
+                <MaterialIcons name="water-drop" size={20} color={colors.primary} style={styles.sectionIcon} />
                 <ThemedText style={styles.bloodTypeBadgeLabel}>Your blood type</ThemedText>
                 <View style={[styles.bloodTypeBadge, isSavingBloodType && { opacity: 0.5 }]}>
                   <ThemedText style={styles.bloodTypeBadgeText}>
                     {selectedBloodType || '—'}
                   </ThemedText>
                 </View>
-                {isSavingBloodType && <ActivityIndicator size="small" color="#E74C3C" style={{ marginLeft: 8 }} />}
+                {isSavingBloodType && <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 8 }} />}
               </View>
 
               {!selectedBloodType && !isSavingBloodType && (
@@ -372,12 +375,12 @@ export default function DonateBloodScreen() {
                     <MaterialIcons
                       name="location-on"
                       size={20}
-                      color={locationError ? '#E74C3C' : '#27AE60'}
+                      color={locationError ? colors.primary : colors.success}
                       style={styles.inputIcon}
                     />
                     {locationLoading ? (
                       <View style={styles.locationLoadingRow}>
-                        <ActivityIndicator size="small" color="#4A90E2" />
+                        <ActivityIndicator size="small" color={colors.accent} />
                         <ThemedText style={styles.locationLoadingText}>Detecting location...</ThemedText>
                       </View>
                     ) : locationError ? (
@@ -394,7 +397,7 @@ export default function DonateBloodScreen() {
                 </View>
                 <TouchableOpacity style={styles.radiusButton} onPress={cycleRadius}>
                   <ThemedText style={styles.radiusText}>{selectedRadius}</ThemedText>
-                  <MaterialIcons name="my-location" size={16} color="#4A90E2" style={styles.radiusIcon} />
+                  <MaterialIcons name="my-location" size={16} color={colors.accent} style={styles.radiusIcon} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -402,7 +405,7 @@ export default function DonateBloodScreen() {
             {/* Nearby Centers Section */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <MaterialIcons name="map" size={20} color="#4A90E2" style={styles.sectionIcon} />
+                <MaterialIcons name="map" size={20} color={colors.accent} style={styles.sectionIcon} />
                 <ThemedText style={styles.sectionTitle}>Nearby Centers</ThemedText>
               </View>
 
@@ -426,7 +429,7 @@ export default function DonateBloodScreen() {
                       <Polyline
                         coordinates={routeCoords}
                         strokeWidth={4}
-                        strokeColor="#4A90E2"
+                        strokeColor={colors.accent}
                       />
                     )}
 
@@ -440,7 +443,7 @@ export default function DonateBloodScreen() {
                         }}
                         title={center.institution_name}
                         description={center.address || ''}
-                        pinColor={(center as any).profiles?.user_type === 'blood_bank' ? '#E74C3C' : '#4A90E2'}
+                        pinColor={(center as any).profiles?.user_type === 'blood_bank' ? colors.primary : colors.accent}
                         onPress={() => setSelectedCenter(center.id)}
                       />
                     ))}
@@ -448,7 +451,7 @@ export default function DonateBloodScreen() {
                 ) : locationCoords && !mapsAvailable ? (
                   /* Fallback when react-native-maps is not available (Expo Go) */
                   <View style={styles.mapPlaceholder}>
-                    <MaterialIcons name="map" size={40} color="#4A90E2" />
+                    <MaterialIcons name="map" size={40} color={colors.accent} />
                     <ThemedText style={styles.mapText}>
                       {locationText || `${locationCoords.latitude.toFixed(4)}, ${locationCoords.longitude.toFixed(4)}`}
                     </ThemedText>
@@ -472,12 +475,12 @@ export default function DonateBloodScreen() {
                   <View style={styles.mapPlaceholder}>
                     {locationLoading ? (
                       <>
-                        <ActivityIndicator size="large" color="#4A90E2" />
+                        <ActivityIndicator size="large" color={colors.accent} />
                         <ThemedText style={styles.mapText}>Loading map...</ThemedText>
                       </>
                     ) : (
                       <>
-                        <MaterialIcons name="map" size={40} color="#7F8C8D" />
+                        <MaterialIcons name="map" size={40} color={colors.icon} />
                         <ThemedText style={styles.mapText}>Enable location to view map</ThemedText>
                         <TouchableOpacity onPress={detectLocation} style={styles.mapRetryButton}>
                           <ThemedText style={styles.mapRetryText}>Detect location</ThemedText>
@@ -510,7 +513,7 @@ export default function DonateBloodScreen() {
                         <MaterialIcons
                           name={(center as any).profiles?.user_type === 'blood_bank' ? 'local-hospital' : 'business'}
                           size={24}
-                          color={selectedCenter === center.id ? '#FFFFFF' : '#7F8C8D'}
+                          color={selectedCenter === center.id ? colors.surface : colors.icon}
                         />
                       </View>
                       <View style={styles.centerInfo}>
@@ -521,7 +524,7 @@ export default function DonateBloodScreen() {
                       </View>
                       {selectedCenter === center.id ? (
                         <View style={styles.centerCheckmark}>
-                          <MaterialIcons name="check-circle" size={24} color="#27AE60" />
+                          <MaterialIcons name="check-circle" size={24} color={colors.success} />
                         </View>
                       ) : (
                         <View style={styles.centerBloodTypes}>
@@ -541,7 +544,7 @@ export default function DonateBloodScreen() {
             {/* Date & Time Section */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <MaterialIcons name="event" size={20} color="#4A90E2" style={styles.sectionIcon} />
+                <MaterialIcons name="event" size={20} color={colors.accent} style={styles.sectionIcon} />
                 <ThemedText style={styles.sectionTitle}>Preferred Date & Time</ThemedText>
               </View>
 
@@ -554,7 +557,7 @@ export default function DonateBloodScreen() {
                       style={[styles.dateTimeButton, { flex: 0, width: '100%' }]}
                       onPress={() => setShowDatePicker(true)}
                     >
-                      <MaterialIcons name="calendar-today" size={20} color="#4A90E2" />
+                      <MaterialIcons name="calendar-today" size={20} color={colors.accent} />
                       <ThemedText style={dateChosen ? styles.dateTimeValue : styles.dateTimePlaceholder}>
                         {dateChosen ? selectedDate.toLocaleDateString() : 'Select date'}
                       </ThemedText>
@@ -565,7 +568,7 @@ export default function DonateBloodScreen() {
 
                   {slotsLoading ? (
                     <View style={{ paddingVertical: 12, alignItems: 'center' }}>
-                      <ActivityIndicator size="small" color="#4A90E2" />
+                      <ActivityIndicator size="small" color={colors.accent} />
                     </View>
                   ) : !dateChosen ? (
                     <ThemedText style={styles.emptyText}>Choose a date above to check slot availability.</ThemedText>
@@ -602,7 +605,7 @@ export default function DonateBloodScreen() {
                               }
                             }}
                           >
-                            <ThemedText style={[styles.slotTimeText, isSelected && styles.slotTimeTextSelected, isFull && !isSelected && { color: '#92400E' }]}>
+                            <ThemedText style={[styles.slotTimeText, isSelected && styles.slotTimeTextSelected, isFull && !isSelected && { color: isDark ? '#FDE68A' : '#92400E' }]}>
                               {startTimeStr} - {endTimeStr}
                             </ThemedText>
                             <ThemedText
@@ -671,9 +674,9 @@ export default function DonateBloodScreen() {
               }}
             >
               {booking ? (
-                <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
+                <ActivityIndicator size="small" color={colors.surface} style={{ marginRight: 8 }} />
               ) : (
-                <MaterialIcons name="event-available" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                <MaterialIcons name="event-available" size={20} color={colors.surface} style={{ marginRight: 8 }} />
               )}
               <ThemedText style={styles.submitButtonText}>
                 {booking ? 'Booking...' : 'Book Appointment'}
@@ -689,14 +692,14 @@ export default function DonateBloodScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F8F4F4',
+    backgroundColor: colors.background,
   },
   container: {
     flex: 1,
-    backgroundColor: '#F8F4F4',
+    backgroundColor: colors.background,
   },
   contentContainer: {
     padding: 16,
@@ -714,7 +717,7 @@ const styles = StyleSheet.create({
   },
   backIcon: {
     fontSize: 24,
-    color: '#2C3E50',
+    color: colors.textPrimary,
   },
   headerContent: {
     flex: 1,
@@ -722,25 +725,27 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#2C3E50',
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 14,
-    color: '#7F8C8D',
+    color: colors.textSecondary,
   },
 
   // Section
   section: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
-    shadowColor: '#000',
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: isDark ? 0.3 : 0.1,
     shadowRadius: 8,
     elevation: 4,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -754,7 +759,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#2C3E50',
+    color: colors.textPrimary,
   },
 
   // Input
@@ -769,18 +774,18 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
-    color: '#7F8C8D',
+    color: colors.textSecondary,
     marginBottom: 8,
   },
   inputField: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F4F4',
+    backgroundColor: colors.background,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: '#E8E8E8',
+    borderColor: colors.borderLight,
   },
   inputIcon: {
     fontSize: 16,
@@ -789,7 +794,7 @@ const styles = StyleSheet.create({
   textInput: {
     flex: 1,
     fontSize: 16,
-    color: '#2C3E50',
+    color: colors.textPrimary,
   },
 
   // Location detection
@@ -801,18 +806,18 @@ const styles = StyleSheet.create({
   },
   locationLoadingText: {
     fontSize: 14,
-    color: '#7F8C8D',
+    color: colors.textSecondary,
   },
   locationErrorRow: {
     flex: 1,
   },
   locationErrorText: {
     fontSize: 14,
-    color: '#E74C3C',
+    color: colors.primary,
   },
   locationRetryHint: {
     fontSize: 12,
-    color: '#7F8C8D',
+    color: colors.textSecondary,
     fontStyle: 'italic',
     marginTop: 2,
   },
@@ -827,10 +832,10 @@ const styles = StyleSheet.create({
   },
   bloodTypeBadgeLabel: {
     fontSize: 14,
-    color: '#7F8C8D',
+    color: colors.textSecondary,
   },
   bloodTypeBadge: {
-    backgroundColor: '#E74C3C',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 6,
@@ -841,16 +846,16 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   bloodTypeSelection: {
-    backgroundColor: '#FDF2F2',
+    backgroundColor: isDark ? 'rgba(231, 76, 60, 0.1)' : '#FDF2F2',
     padding: 16,
     borderRadius: 12,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#FEE2E2',
+    borderColor: isDark ? 'rgba(231, 76, 60, 0.3)' : '#FEE2E2',
   },
   bloodTypeSelectionLabel: {
     fontSize: 14,
-    color: '#E74C3C',
+    color: colors.primary,
     fontWeight: '600',
     marginBottom: 12,
   },
@@ -860,9 +865,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   bloodTypeOption: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: '#E74C3C',
+    borderColor: colors.primary,
     borderRadius: 8,
     width: '22%',
     aspectRatio: 1.5,
@@ -870,7 +875,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   bloodTypeOptionText: {
-    color: '#E74C3C',
+    color: colors.primary,
     fontWeight: 'bold',
     fontSize: 16,
   },
@@ -879,17 +884,17 @@ const styles = StyleSheet.create({
   radiusButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: '#E8E8E8',
+    borderColor: colors.borderLight,
   },
   radiusText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#2C3E50',
+    color: colors.textPrimary,
     marginRight: 4,
   },
   radiusIcon: {
@@ -907,21 +912,21 @@ const styles = StyleSheet.create({
   },
   mapPlaceholder: {
     height: 250,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: colors.borderLight,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E8E8E8',
+    borderColor: colors.borderLight,
     gap: 8,
   },
   mapText: {
     fontSize: 14,
-    color: '#7F8C8D',
+    color: colors.textSecondary,
     marginTop: 8,
   },
   mapRetryButton: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: colors.accent,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -941,20 +946,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    backgroundColor: '#F8F4F4',
+    backgroundColor: colors.background,
     borderRadius: 12,
     borderWidth: 2,
     borderColor: 'transparent',
   },
   centerCardSelected: {
-    borderColor: '#27AE60',
-    backgroundColor: '#F0FFF4',
+    borderColor: colors.success,
+    backgroundColor: isDark ? 'rgba(39, 174, 96, 0.1)' : '#F0FFF4',
   },
   centerAvatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#E8E8E8',
+    backgroundColor: colors.borderLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -968,19 +973,19 @@ const styles = StyleSheet.create({
   centerName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2C3E50',
+    color: colors.textPrimary,
     marginBottom: 2,
   },
   centerDetails: {
     fontSize: 14,
-    color: '#7F8C8D',
+    color: colors.textSecondary,
   },
   centerBloodTypes: {
     flexDirection: 'row',
     gap: 4,
   },
   bloodTypeTag: {
-    backgroundColor: '#E74C3C',
+    backgroundColor: colors.primary,
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -1003,29 +1008,29 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F4F4',
+    backgroundColor: colors.background,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     gap: 10,
     borderWidth: 1,
-    borderColor: '#E8E8E8',
+    borderColor: colors.borderLight,
   },
   dateTimeValue: {
     fontSize: 15,
-    color: '#2C3E50',
+    color: colors.textPrimary,
     fontWeight: '500',
   },
   dateTimePlaceholder: {
     fontSize: 15,
-    color: '#7F8C8D',
+    color: colors.textSecondary,
   },
 
 
   // Action Button
   submitButton: {
     flexDirection: 'row',
-    backgroundColor: '#E74C3C',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
@@ -1033,7 +1038,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   submitButtonDisabled: {
-    backgroundColor: '#BDC3C7',
+    backgroundColor: colors.borderLight,
   },
   submitButtonText: {
     fontSize: 16,
@@ -1052,7 +1057,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: '#7F8C8D',
+    color: colors.textSecondary,
     fontSize: 16,
   },
   errorContainer: {
@@ -1062,13 +1067,13 @@ const styles = StyleSheet.create({
   },
   errorText: {
     marginTop: 12,
-    color: '#E74C3C',
+    color: colors.primary,
     fontSize: 14,
     textAlign: 'center',
     marginBottom: 20,
   },
   retryButton: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: colors.accent,
     paddingHorizontal: 24,
     paddingVertical: 10,
     borderRadius: 8,
@@ -1079,7 +1084,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     textAlign: 'center',
-    color: '#7F8C8D',
+    color: colors.textSecondary,
     padding: 20,
     fontStyle: 'italic',
   },
@@ -1087,30 +1092,30 @@ const styles = StyleSheet.create({
   // Cooldown Banner
   cooldownBanner: {
     flexDirection: 'row',
-    backgroundColor: '#FEF3C7',
+    backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#FEF3C7',
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
     alignItems: 'flex-start',
     gap: 12,
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: isDark ? 'rgba(245, 158, 11, 0.3)' : '#FDE68A',
   },
   cooldownTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#92400E',
+    color: isDark ? '#FDE68A' : '#92400E',
     marginBottom: 4,
   },
   cooldownText: {
     fontSize: 14,
-    color: '#A16207',
+    color: isDark ? '#FCD34D' : '#A16207',
     lineHeight: 20,
   },
   cooldownDays: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#92400E',
+    color: isDark ? '#FDE68A' : '#92400E',
     marginTop: 4,
   },
   slotsContainer: {
@@ -1120,9 +1125,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   slotButton: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: '#E8E8E8',
+    borderColor: colors.borderLight,
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -1131,48 +1136,48 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   slotButtonSelected: {
-    borderColor: '#27AE60',
-    backgroundColor: '#F0FFF4',
+    borderColor: colors.success,
+    backgroundColor: isDark ? 'rgba(39, 174, 96, 0.1)' : '#F0FFF4',
   },
   slotButtonDisabled: {
-    backgroundColor: '#F5F5F5',
-    borderColor: '#E8E8E8',
+    backgroundColor: colors.background,
+    borderColor: colors.borderLight,
     opacity: 0.6,
   },
   slotButtonBusy: {
-    borderColor: '#F59E0B',
-    backgroundColor: '#FEF3C7',
+    borderColor: isDark ? '#F59E0B' : '#F59E0B',
+    backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#FEF3C7',
   },
   slotTimeText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#2C3E50',
+    color: colors.textPrimary,
   },
   slotTimeTextSelected: {
-    color: '#27AE60',
+    color: colors.success,
   },
   slotCapacityText: {
     fontSize: 12,
-    color: '#7F8C8D',
+    color: colors.textSecondary,
     marginTop: 4,
   },
   slotCapacityTextSelected: {
-    color: '#27AE60',
+    color: colors.success,
     fontWeight: '500',
   },
   slotCapacityTextFull: {
-    color: '#C0392B',
+    color: colors.primary,
     fontWeight: '600',
   },
   slotCapacityTextBusy: {
-    color: '#D97706',
+    color: isDark ? '#FDE68A' : '#D97706',
     fontWeight: '700',
   },
   slotsLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#2C3E50',
+    color: colors.textPrimary,
     marginBottom: 8,
     marginTop: 12,
   },
-});
+}), [colors, isDark]);

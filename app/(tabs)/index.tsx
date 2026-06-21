@@ -1,7 +1,7 @@
 import { MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Location from "expo-location";
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   ActivityIndicator,
   Linking,
@@ -16,6 +16,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle } from "react-native-svg";
 
+import { useTheme } from "@/hooks/useTheme";
 import { ThemedText } from "@/components/themed-text";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/contexts/NotificationContext";
@@ -25,13 +26,13 @@ import { getActiveRequests } from "@/services/requestService";
 import { getDonorRequestStatuses, DonationStatus } from "@/services/donationService";
 import { getCache, setCache } from "@/services/offlineCache";
 
-const STATUS_CONFIG: Record<DonationStatus, { label: string; color: string; bg: string; borderColor: string; cardBg: string }> = {
-  scheduled: { label: 'Scheduled', color: '#2563EB', bg: '#DBEAFE', borderColor: '#93C5FD', cardBg: '#EFF6FF' },
-  confirmed: { label: 'Confirmed', color: '#D97706', bg: '#FEF3C7', borderColor: '#FDE68A', cardBg: '#FFFBEB' },
-  completed: { label: 'Donated', color: '#16A34A', bg: '#DCFCE7', borderColor: '#BBF7D0', cardBg: '#F0FDF4' },
-  cancelled: { label: 'Cancelled', color: '#64748B', bg: '#F1F5F9', borderColor: '#E2E8F0', cardBg: '#F8FAFC' },
-  no_show: { label: 'No Show', color: '#64748B', bg: '#F1F5F9', borderColor: '#E2E8F0', cardBg: '#F8FAFC' },
-};
+const getStatusConfig = (colors: any, isDark: boolean): Record<DonationStatus, { label: string; color: string; bg: string; borderColor: string; cardBg: string }> => ({
+  scheduled: { label: 'Scheduled', color: isDark ? '#60A5FA' : '#2563EB', bg: isDark ? '#1E3A8A' : '#DBEAFE', borderColor: isDark ? '#1E40AF' : '#93C5FD', cardBg: isDark ? '#172554' : '#EFF6FF' },
+  confirmed: { label: 'Confirmed', color: isDark ? '#FBBF24' : '#D97706', bg: isDark ? '#78350F' : '#FEF3C7', borderColor: isDark ? '#92400E' : '#FDE68A', cardBg: isDark ? '#451A03' : '#FFFBEB' },
+  completed: { label: 'Donated', color: isDark ? '#4ADE80' : '#16A34A', bg: isDark ? '#14532D' : '#DCFCE7', borderColor: isDark ? '#166534' : '#BBF7D0', cardBg: isDark ? '#052E16' : '#F0FDF4' },
+  cancelled: { label: 'Cancelled', color: colors.textSecondary, bg: colors.borderLight, borderColor: colors.border, cardBg: colors.background },
+  no_show: { label: 'No Show', color: colors.textSecondary, bg: colors.borderLight, borderColor: colors.border, cardBg: colors.background },
+});
 
 function getTimeAgo(dateStr: string): string {
   const now = Date.now();
@@ -59,6 +60,8 @@ const BLOOD_COMPAT = [
 export default function HomeScreen() {
   const { user } = useAuth();
   const { newCount } = useNotifications();
+  const { colors, isDark } = useTheme();
+  const s = useStyles(colors, isDark);
 
   const [bloodType, setBloodType] = useState<string | null>(null);
   const [nearbyCenters, setNearbyCenters] = useState<{ count: number; radiusKm: number } | null>(null);
@@ -152,7 +155,8 @@ export default function HomeScreen() {
 
   const HIDDEN_STATUSES = new Set(['completed', 'cancelled', 'no_show']);
   const visibleRequests = requests.filter(r => !HIDDEN_STATUSES.has(requestStatuses.get(r.id) as string));
-  const urgencyColors: Record<string, string> = { critical: '#DC2626', high: '#EA580C', moderate: '#F59E0B', low: '#16A34A' };
+  const urgencyColors: Record<string, string> = { critical: colors.error, high: colors.warning, moderate: '#F59E0B', low: colors.success };
+  const STATUS_CONFIG = getStatusConfig(colors, isDark);
 
   return (
     <SafeAreaView style={s.safe}>
@@ -162,11 +166,11 @@ export default function HomeScreen() {
         <View style={s.header}>
           <View style={s.headerRow}>
             <View style={s.logoRow}>
-              <MaterialIcons name="favorite" size={26} color="#E74C3C" />
+              <MaterialIcons name="favorite" size={26} color={colors.primary} />
               <ThemedText style={s.logoText}>iDonate</ThemedText>
             </View>
             <TouchableOpacity style={s.bellBtn} onPress={() => router.push("/notifications")}>
-              <MaterialIcons name="notifications-none" size={26} color="#1E293B" />
+              <MaterialIcons name="notifications-none" size={26} color={colors.textPrimary} />
               {newCount > 0 && (
                 <View style={s.badge}><ThemedText style={s.badgeText}>{newCount}</ThemedText></View>
               )}
@@ -193,7 +197,7 @@ export default function HomeScreen() {
             <TouchableOpacity style={s.requestCardWrap} activeOpacity={0.85} onPress={() => router.push("/request-blood")}>
               <View style={s.requestCard}>
                 <View style={s.requestIconCircle}>
-                  <Ionicons name="hand-left" size={26} color="#3B82F6" />
+                  <Ionicons name="hand-left" size={26} color={colors.accent} />
                 </View>
                 <ThemedText style={s.requestTitle}>Request Blood</ThemedText>
                 <ThemedText style={s.requestSubtitle}>Get help from donors</ThemedText>
@@ -205,7 +209,7 @@ export default function HomeScreen() {
         {/* ── Summary Pills ── */}
         <View style={s.pills}>
           <TouchableOpacity style={s.pill} onPress={() => router.navigate("/(tabs)/map")}>
-            <MaterialIcons name="location-on" size={18} color="#DC2626" />
+            <MaterialIcons name="location-on" size={18} color={colors.primary} />
             <ThemedText style={s.pillLabel}>Nearby</ThemedText>
             <ThemedText style={s.pillValue}>
               {loading ? '…' : nearbyCenters ? `${nearbyCenters.count}` : '—'}
@@ -215,23 +219,23 @@ export default function HomeScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity style={s.pill} onPress={() => router.push("/donate-blood")}>
-            <MaterialIcons name="water-drop" size={18} color="#DC2626" />
+            <MaterialIcons name="water-drop" size={18} color={colors.primary} />
             <ThemedText style={s.pillLabel}>Your blood type</ThemedText>
             <ThemedText style={s.pillValue}>{loading ? '…' : bloodType ?? '—'}</ThemedText>
             <ThemedText style={s.pillSub}> </ThemedText>
-            <ThemedText style={[s.pillLink, { color: '#DC2626' }]}>Edit ›</ThemedText>
+            <ThemedText style={[s.pillLink, { color: colors.primary }]}>Edit ›</ThemedText>
           </TouchableOpacity>
 
           <TouchableOpacity style={s.pill} onPress={() => router.navigate("/(tabs)/profile")}>
             {loading ? (
-              <ActivityIndicator size="small" color="#94A3B8" />
+              <ActivityIndicator size="small" color={colors.textSecondary} />
             ) : cooldownInfo.isEligible ? (
               <>
-                <MaterialIcons name="check-circle" size={22} color="#16A34A" />
+                <MaterialIcons name="check-circle" size={22} color={colors.success} />
                 <ThemedText style={s.pillLabel}>Eligible to donate</ThemedText>
-                <ThemedText style={[s.pillValue, { color: '#16A34A' }]}>Yes</ThemedText>
+                <ThemedText style={[s.pillValue, { color: colors.success }]}>Yes</ThemedText>
                 <ThemedText style={s.pillSub}> </ThemedText>
-                <ThemedText style={[s.pillLink, { color: '#16A34A' }]}>Learn more ›</ThemedText>
+                <ThemedText style={[s.pillLink, { color: colors.success }]}>Learn more ›</ThemedText>
               </>
             ) : (
               <>
@@ -242,7 +246,7 @@ export default function HomeScreen() {
                       <Circle cx={25} cy={25} r={20.25} stroke="#FEF3C7" strokeWidth={4.5} fill="none" />
                       <Circle
                         cx={25} cy={25} r={20.25}
-                        stroke="#F59E0B" strokeWidth={4.5} fill="none"
+                        stroke={colors.warning} strokeWidth={4.5} fill="none"
                         strokeLinecap="round"
                         strokeDasharray={`${2 * Math.PI * 20.25}`}
                         strokeDashoffset={`${2 * Math.PI * 20.25 * (1 - cooldownProgress)}`}
@@ -254,10 +258,10 @@ export default function HomeScreen() {
                   </View>
                 </View>
                 <ThemedText style={s.pillLabel}>Days left</ThemedText>
-                <ThemedText style={[s.pillValue, { fontSize: 16, color: '#D97706' }]}>
+                <ThemedText style={[s.pillValue, { fontSize: 16, color: colors.warning }]}>
                   {cooldownInfo.nextEligibleDate?.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                 </ThemedText>
-                <ThemedText style={[s.pillLink, { color: '#D97706' }]}>Details ›</ThemedText>
+                <ThemedText style={[s.pillLink, { color: colors.warning }]}>Details ›</ThemedText>
               </>
             )}
           </TouchableOpacity>
@@ -272,7 +276,7 @@ export default function HomeScreen() {
         </View>
 
         {loading ? (
-          <ActivityIndicator size="small" color="#DC2626" style={{ marginBottom: 16 }} />
+          <ActivityIndicator size="small" color={colors.primary} style={{ marginBottom: 16 }} />
         ) : visibleRequests.length === 0 ? (
           <View style={s.emptyCard}>
             <ThemedText style={s.emptyText}>No active requests right now</ThemedText>
@@ -284,7 +288,7 @@ export default function HomeScreen() {
             const name = isOwn ? 'You' : (req.institution_name || req.profiles?.full_name || 'Unknown');
             const donationStatus = requestStatuses.get(req.id);
             const statusCfg = donationStatus ? STATUS_CONFIG[donationStatus] : null;
-            const urgColor = urgencyColors[req.urgency_level] || '#DC2626';
+            const urgColor = urgencyColors[req.urgency_level] || colors.primary;
             return (
               <TouchableOpacity key={req.id} style={[s.reqCard, statusCfg && { backgroundColor: statusCfg.cardBg, borderWidth: 1.5, borderColor: statusCfg.borderColor }]} activeOpacity={0.7}
                 onPress={() => router.push({ pathname: '/blood-request/[id]', params: { id: req.id } } as any)}>
@@ -324,10 +328,10 @@ export default function HomeScreen() {
         </View>
 
         {loading ? (
-          <ActivityIndicator size="small" color="#7F8C8D" style={{ marginVertical: 16 }} />
+          <ActivityIndicator size="small" color={colors.textSecondary} style={{ marginVertical: 16 }} />
         ) : nearbyInstitutions.length === 0 ? (
           <View style={s.emptyCard}>
-            <MaterialIcons name="location-off" size={28} color="#BDC3C7" />
+            <MaterialIcons name="location-off" size={28} color={colors.iconMuted} />
             <ThemedText style={s.emptyText}>No centers found nearby</ThemedText>
           </View>
         ) : (
@@ -337,7 +341,7 @@ export default function HomeScreen() {
                 <MaterialIcons
                   name={inst.institution_type === 'blood_bank' ? 'water-drop' : 'local-hospital'}
                   size={22}
-                  color={inst.institution_type === 'blood_bank' ? '#DC2626' : '#3B82F6'}
+                  color={inst.institution_type === 'blood_bank' ? colors.primary : colors.accent}
                 />
               </View>
               <View style={{ flex: 1 }}>
@@ -354,7 +358,7 @@ export default function HomeScreen() {
                   if (url) Linking.openURL(url);
                 }}
               >
-                <MaterialIcons name="navigation" size={20} color="#DC2626" />
+                <MaterialIcons name="navigation" size={20} color={colors.primary} />
               </TouchableOpacity>
             </View>
           ))
@@ -384,12 +388,12 @@ export default function HomeScreen() {
 
         {/* ── Motivational Banner ── */}
         <TouchableOpacity style={s.motiveBanner} activeOpacity={0.8} onPress={() => router.push("/donate-blood")}>
-          <MaterialIcons name="favorite" size={22} color="#DC2626" />
+          <MaterialIcons name="favorite" size={22} color={colors.primary} />
           <View style={{ flex: 1, marginLeft: 12 }}>
             <ThemedText style={s.motiveTitle}>Every drop counts.</ThemedText>
             <ThemedText style={s.motiveSub}>Your donation can save up to 3 lives.</ThemedText>
           </View>
-          <MaterialIcons name="chevron-right" size={24} color="#94A3B8" />
+          <MaterialIcons name="chevron-right" size={24} color={colors.textSecondary} />
         </TouchableOpacity>
 
         <View style={{ height: 24 }} />
@@ -398,8 +402,8 @@ export default function HomeScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F8FAFC' },
+const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.background },
   scroll: { flex: 1 },
   content: { paddingHorizontal: 20, paddingBottom: 100 },
 
@@ -407,16 +411,16 @@ const s = StyleSheet.create({
   header: { paddingTop: 12, marginBottom: 20 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  logoText: { fontSize: 26, fontWeight: '800', color: '#1E293B' },
+  logoText: { fontSize: 26, fontWeight: '800', color: colors.textPrimary },
   bellBtn: { position: 'relative', padding: 4 },
-  badge: { position: 'absolute', top: 0, right: 0, backgroundColor: '#DC2626', borderRadius: 10, minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#F8FAFC' },
+  badge: { position: 'absolute', top: 0, right: 0, backgroundColor: colors.primary, borderRadius: 10, minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: colors.background },
   badgeText: { color: '#FFF', fontSize: 10, fontWeight: 'bold' },
-  tagline: { fontSize: 14, color: '#94A3B8', marginTop: 2 },
-  taglineAccent: { color: '#DC2626', fontWeight: '600' },
+  tagline: { fontSize: 14, color: colors.textSecondary, marginTop: 2 },
+  taglineAccent: { color: colors.primary, fontWeight: '600' },
 
   // Action cards
   actionSection: { marginBottom: 20 },
-  sectionTitle: { fontSize: 17, fontWeight: '700', color: '#1E293B', marginBottom: 14 },
+  sectionTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: 14 },
   actionCards: { flexDirection: 'row', gap: 12 },
   donateCardWrap: { flex: 1.15 },
   donateCard: { borderRadius: 20, padding: 20, height: 150, justifyContent: 'flex-end' },
@@ -424,62 +428,62 @@ const s = StyleSheet.create({
   donateTitle: { fontSize: 17, fontWeight: '800', color: '#FFFFFF', marginBottom: 2 },
   donateSubtitle: { fontSize: 12, color: 'rgba(255,255,255,0.85)' },
   requestCardWrap: { flex: 1 },
-  requestCard: { borderRadius: 20, padding: 20, height: 150, justifyContent: 'flex-end', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  requestIconCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#EFF6FF', justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
-  requestTitle: { fontSize: 17, fontWeight: '800', color: '#1E293B', marginBottom: 2 },
-  requestSubtitle: { fontSize: 12, color: '#94A3B8' },
+  requestCard: { borderRadius: 20, padding: 20, height: 150, justifyContent: 'flex-end', backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, shadowColor: colors.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: isDark ? 0.2 : 0.05, shadowRadius: 8, elevation: 2 },
+  requestIconCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.accentLight, justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
+  requestTitle: { fontSize: 17, fontWeight: '800', color: colors.textPrimary, marginBottom: 2 },
+  requestSubtitle: { fontSize: 12, color: colors.textSecondary },
 
   // Pills
   pills: { flexDirection: 'row', gap: 10, marginBottom: 24 },
-  pill: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2, borderWidth: 1, borderColor: '#F1F5F9' },
-  pillLabel: { fontSize: 11, color: '#94A3B8', marginTop: 6, textAlign: 'center' },
-  pillValue: { fontSize: 22, fontWeight: '800', color: '#1E293B', marginTop: 2 },
-  pillSub: { fontSize: 11, color: '#94A3B8' },
-  pillLink: { fontSize: 11, fontWeight: '600', color: '#3B82F6', marginTop: 4 },
+  pill: { flex: 1, backgroundColor: colors.card, borderRadius: 16, padding: 14, alignItems: 'center', shadowColor: colors.shadowColor, shadowOffset: { width: 0, height: 1 }, shadowOpacity: isDark ? 0.2 : 0.04, shadowRadius: 6, elevation: 2, borderWidth: 1, borderColor: colors.borderLight },
+  pillLabel: { fontSize: 11, color: colors.textSecondary, marginTop: 6, textAlign: 'center' },
+  pillValue: { fontSize: 22, fontWeight: '800', color: colors.textPrimary, marginTop: 2 },
+  pillSub: { fontSize: 11, color: colors.textSecondary },
+  pillLink: { fontSize: 11, fontWeight: '600', color: colors.accent, marginTop: 4 },
 
   // Cooldown ring
-  ringCenter: { position: 'absolute', width: 38, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
-  ringText: { fontSize: 14, fontWeight: '800', color: '#D97706' },
+  ringCenter: { position: 'absolute', width: 38, height: 38, borderRadius: 19, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
+  ringText: { fontSize: 14, fontWeight: '800', color: colors.warning },
 
   // Section header
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  viewAll: { fontSize: 14, fontWeight: '600', color: '#DC2626' },
+  viewAll: { fontSize: 14, fontWeight: '600', color: colors.primary },
 
   // Request cards
-  reqCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2, borderWidth: 1, borderColor: '#F1F5F9' },
+  reqCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: 16, padding: 14, marginBottom: 10, shadowColor: colors.shadowColor, shadowOffset: { width: 0, height: 1 }, shadowOpacity: isDark ? 0.2 : 0.04, shadowRadius: 6, elevation: 2, borderWidth: 1, borderColor: colors.borderLight },
   reqAvatar: { width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   reqAvatarText: { color: '#FFF', fontWeight: '800', fontSize: 13 },
   reqContent: { flex: 1 },
-  reqName: { fontSize: 15, fontWeight: '700', color: '#1E293B', marginBottom: 2 },
-  reqMeta: { fontSize: 12, color: '#94A3B8' },
-  reqDesc: { fontSize: 11, color: '#94A3B8', marginTop: 2 },
+  reqName: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: 2 },
+  reqMeta: { fontSize: 12, color: colors.textSecondary },
+  reqDesc: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
   miniTag: { borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
   miniTagText: { fontSize: 10, fontWeight: '700' },
   urgencyBadge: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5, marginLeft: 8 },
   urgencyText: { fontSize: 11, fontWeight: '700' },
 
   // Empty
-  emptyCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 24, alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#F1F5F9' },
-  emptyText: { color: '#94A3B8', fontSize: 14, marginTop: 4 },
+  emptyCard: { backgroundColor: colors.card, borderRadius: 16, padding: 24, alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: colors.borderLight },
+  emptyText: { color: colors.textSecondary, fontSize: 14, marginTop: 4 },
 
   // Center cards
-  centerCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2, borderWidth: 1, borderColor: '#F1F5F9' },
-  centerIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  centerName: { fontSize: 15, fontWeight: '600', color: '#1E293B', marginBottom: 2 },
-  centerMeta: { fontSize: 12, color: '#94A3B8' },
-  navBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FEF2F2', justifyContent: 'center', alignItems: 'center', marginLeft: 8 },
+  centerCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: 16, padding: 14, marginBottom: 10, shadowColor: colors.shadowColor, shadowOffset: { width: 0, height: 1 }, shadowOpacity: isDark ? 0.2 : 0.04, shadowRadius: 6, elevation: 2, borderWidth: 1, borderColor: colors.borderLight },
+  centerIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.borderLight, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  centerName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, marginBottom: 2 },
+  centerMeta: { fontSize: 12, color: colors.textSecondary },
+  navBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primaryLight, justifyContent: 'center', alignItems: 'center', marginLeft: 8 },
 
   // Compatibility
   compatRow: { paddingBottom: 4, gap: 10, marginBottom: 20 },
-  compatCard: { width: 120, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: '#F1F5F9', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
-  compatType: { fontSize: 18, fontWeight: '800', color: '#1E293B', marginTop: 6 },
-  compatInfo: { fontSize: 10, color: '#94A3B8', textAlign: 'center', marginTop: 4 },
-  compatMore: { width: 100, backgroundColor: '#F8FAFC', borderRadius: 16, padding: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
-  compatMoreCount: { fontSize: 16, fontWeight: '700', color: '#64748B' },
-  compatMoreLink: { fontSize: 12, color: '#DC2626', fontWeight: '600', marginTop: 4 },
+  compatCard: { width: 120, backgroundColor: colors.card, borderRadius: 16, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: colors.borderLight, shadowColor: colors.shadowColor, shadowOffset: { width: 0, height: 1 }, shadowOpacity: isDark ? 0.2 : 0.04, shadowRadius: 4, elevation: 1 },
+  compatType: { fontSize: 18, fontWeight: '800', color: colors.textPrimary, marginTop: 6 },
+  compatInfo: { fontSize: 10, color: colors.textSecondary, textAlign: 'center', marginTop: 4 },
+  compatMore: { width: 100, backgroundColor: colors.background, borderRadius: 16, padding: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
+  compatMoreCount: { fontSize: 16, fontWeight: '700', color: colors.icon },
+  compatMoreLink: { fontSize: 12, color: colors.primary, fontWeight: '600', marginTop: 4 },
 
   // Motivational
-  motiveBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF1F2', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#FECDD3' },
-  motiveTitle: { fontSize: 14, fontWeight: '700', color: '#DC2626' },
-  motiveSub: { fontSize: 12, color: '#94A3B8', marginTop: 1 },
-});
+  motiveBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primaryLight, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.primary + '30' },
+  motiveTitle: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  motiveSub: { fontSize: 12, color: colors.textSecondary, marginTop: 1 },
+}), [colors, isDark]);

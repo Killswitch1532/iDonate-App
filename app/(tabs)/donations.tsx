@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, View, TouchableOpacity, Alert, Linking, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, Stack } from "expo-router";
@@ -10,8 +10,11 @@ import { getDonorDonations, cancelDonation, confirmDonorDonation, Donation } fro
 import { getDonorProfile, getCooldownStatus } from "@/services/donorService";
 import { extractCoords } from "@/services/institutionService";
 import { getCache, setCache } from "@/services/offlineCache";
+import { useTheme } from "@/hooks/useTheme";
 
 export default function DonationsScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = useStyles(colors, isDark);
   const { user } = useAuth();
   const [donations, setDonations] = useState<Donation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -130,12 +133,12 @@ export default function DonationsScreen() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'scheduled': return { bg: '#DBEAFE', text: '#2563EB', icon: 'calendar-outline' };
-      case 'confirmed': return { bg: '#FEF3C7', text: '#D97706', icon: 'checkmark-circle-outline' };
-      case 'completed': return { bg: '#DCFCE7', text: '#16A34A', icon: 'ribbon-outline' };
-      case 'cancelled': return { bg: '#FEE2E2', text: '#DC2626', icon: 'close-circle-outline' };
-      case 'no_show': return { bg: '#F1F5F9', text: '#64748B', icon: 'help-circle-outline' };
-      default: return { bg: '#F1F5F9', text: '#64748B', icon: 'ellipse-outline' };
+      case 'scheduled': return { bg: isDark ? '#1E3A8A' : '#DBEAFE', text: isDark ? '#60A5FA' : '#2563EB', icon: 'calendar-outline' };
+      case 'confirmed': return { bg: isDark ? '#78350F' : '#FEF3C7', text: isDark ? '#FBBF24' : '#D97706', icon: 'checkmark-circle-outline' };
+      case 'completed': return { bg: isDark ? '#14532D' : '#DCFCE7', text: isDark ? '#4ADE80' : '#16A34A', icon: 'ribbon-outline' };
+      case 'cancelled': return { bg: colors.error + '20', text: colors.error, icon: 'close-circle-outline' };
+      case 'no_show': return { bg: colors.borderLight, text: colors.textSecondary, icon: 'help-circle-outline' };
+      default: return { bg: colors.borderLight, text: colors.textSecondary, icon: 'ellipse-outline' };
     }
   };
 
@@ -145,7 +148,7 @@ export default function DonationsScreen() {
       <View style={styles.header}>
         <ThemedText style={styles.headerTitle}>My Donations</ThemedText>
         <TouchableOpacity onPress={() => loadDonations(true)} style={styles.refreshBtn}>
-          <Ionicons name="refresh" size={20} color="#64748B" />
+          <Ionicons name="refresh" size={20} color={colors.icon} />
         </TouchableOpacity>
       </View>
 
@@ -175,11 +178,11 @@ export default function DonationsScreen() {
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
         {loading ? (
           <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color="#DC2626" />
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : filteredDonations.length === 0 ? (
           <View style={styles.centerContainer}>
-            <Ionicons name="shield-checkmark-outline" size={64} color="#CBD5E1" />
+            <Ionicons name="shield-checkmark-outline" size={64} color={colors.iconMuted} />
             <ThemedText style={styles.emptyText}>No donations found</ThemedText>
             <ThemedText style={styles.emptySubtext}>
               {activeFilter === 'all' 
@@ -236,19 +239,19 @@ export default function DonationsScreen() {
                   {/* Request Context (if any) */}
                   {requestedType && (
                     <View style={styles.contextRow}>
-                      <Ionicons name="water" size={14} color="#DC2626" />
+                      <Ionicons name="water" size={14} color={colors.primary} />
                       <ThemedText style={styles.contextText}>Response to {requestedType} Request</ThemedText>
                     </View>
                   )}
 
                   <View style={styles.detailsGrid}>
                     <View style={styles.detailItem}>
-                      <Ionicons name="time-outline" size={14} color="#64748B" />
+                      <Ionicons name="time-outline" size={14} color={colors.icon} />
                       <ThemedText style={styles.detailText}>{timeStr}</ThemedText>
                     </View>
                     {donation.units_donated && (
                       <View style={styles.detailItem}>
-                        <Ionicons name="flask-outline" size={14} color="#64748B" />
+                        <Ionicons name="flask-outline" size={14} color={colors.icon} />
                         <ThemedText style={styles.detailText}>{donation.units_donated} Unit{donation.units_donated > 1 ? 's' : ''}</ThemedText>
                       </View>
                     )}
@@ -260,7 +263,7 @@ export default function DonationsScreen() {
                       style={styles.navigateBtn}
                       onPress={() => handleGetDirections(coords.lat, coords.lng, institutionName)}
                     >
-                      <Ionicons name="navigate-outline" size={16} color="#2563EB" />
+                      <Ionicons name="navigate-outline" size={16} color={colors.accent} />
                       <ThemedText style={styles.navigateBtnText}>Get Directions</ThemedText>
                     </TouchableOpacity>
                   )}
@@ -269,7 +272,7 @@ export default function DonationsScreen() {
                   {donation.notes && (
                     <View style={styles.notesSection}>
                       <View style={styles.notesHeader}>
-                        <Ionicons name="chatbubble-ellipses-outline" size={12} color="#64748B" />
+                        <Ionicons name="chatbubble-ellipses-outline" size={12} color={colors.icon} />
                         <ThemedText style={styles.notesLabel}>Notes from Hospital</ThemedText>
                       </View>
                       <ThemedText style={styles.notesText}>{donation.notes}</ThemedText>
@@ -285,10 +288,10 @@ export default function DonationsScreen() {
                         disabled={cancelingId === donation.id}
                       >
                         {cancelingId === donation.id ? (
-                          <ActivityIndicator size="small" color="#64748B" />
+                          <ActivityIndicator size="small" color={colors.icon} />
                         ) : (
                           <>
-                            <Ionicons name="close-circle-outline" size={16} color="#64748B" />
+                            <Ionicons name="close-circle-outline" size={16} color={colors.icon} />
                             <ThemedText style={styles.cancelBtnText}>Cancel</ThemedText>
                           </>
                         )}
@@ -314,7 +317,7 @@ export default function DonationsScreen() {
 
                     {donation.donor_confirmed && donation.status !== 'completed' && (
                       <View style={styles.waitingBadge}>
-                        <Ionicons name="time-outline" size={14} color="#D97706" />
+                        <Ionicons name="time-outline" size={14} color={colors.warning} />
                         <ThemedText style={styles.waitingText}>Waiting for Confirmation</ThemedText>
                       </View>
                     )}
@@ -350,10 +353,10 @@ export default function DonationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -361,23 +364,23 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: colors.borderLight,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#0F172A',
+    color: colors.textPrimary,
   },
   refreshBtn: {
     padding: 8,
     borderRadius: 10,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
   },
 
   filterSection: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     paddingBottom: 12,
   },
   filterContainer: {
@@ -388,21 +391,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.background,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: colors.borderLight,
   },
   activeFilterTab: {
-    backgroundColor: '#FEE2E2',
-    borderColor: '#FCA5A5',
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primary + '50',
   },
   filterTabText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#64748B',
+    color: colors.textSecondary,
   },
   activeFilterTabText: {
-    color: '#DC2626',
+    color: colors.primary,
   },
   container: {
     flex: 1,
@@ -421,19 +424,19 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1E293B',
+    color: colors.textPrimary,
     marginTop: 16,
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#64748B',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 24,
     maxWidth: '80%',
   },
   donateButton: {
-    backgroundColor: '#DC2626',
+    backgroundColor: colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,
@@ -447,14 +450,16 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   historyCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     borderRadius: 20,
     padding: 16,
-    shadowColor: '#000',
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: isDark ? 0.2 : 0.05,
     shadowRadius: 10,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -478,12 +483,12 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#64748B',
+    color: colors.textSecondary,
   },
   institutionName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1F2937',
+    color: colors.textPrimary,
     marginBottom: 6,
   },
   contextRow: {
@@ -491,7 +496,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     marginBottom: 12,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: colors.primaryLight,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
@@ -500,7 +505,7 @@ const styles = StyleSheet.create({
   contextText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#B91C1C',
+    color: colors.primary,
   },
   detailsGrid: {
     flexDirection: 'row',
@@ -514,16 +519,16 @@ const styles = StyleSheet.create({
   },
   detailText: {
     fontSize: 14,
-    color: '#475569',
+    color: colors.textSecondary,
     fontWeight: '500',
   },
   notesSection: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     padding: 12,
     borderRadius: 12,
     marginBottom: 12,
     borderLeftWidth: 3,
-    borderLeftColor: '#E2E8F0',
+    borderLeftColor: colors.border,
   },
   notesHeader: {
     flexDirection: 'row',
@@ -534,12 +539,12 @@ const styles = StyleSheet.create({
   notesLabel: {
     fontSize: 11,
     fontWeight: 'bold',
-    color: '#64748B',
+    color: colors.textSecondary,
     textTransform: 'uppercase',
   },
   notesText: {
     fontSize: 13,
-    color: '#334155',
+    color: colors.textPrimary,
     lineHeight: 18,
     fontStyle: 'italic',
   },
@@ -551,11 +556,11 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.borderLight,
     borderRadius: 12,
   },
   cancelBtnText: {
-    color: '#64748B',
+    color: colors.textSecondary,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -566,7 +571,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     paddingVertical: 12,
-    backgroundColor: '#16A34A',
+    backgroundColor: colors.success,
     borderRadius: 12,
   },
   confirmBtnText: {
@@ -586,13 +591,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     paddingVertical: 12,
-    backgroundColor: '#FFFBEB',
+    backgroundColor: isDark ? '#451A03' : '#FFFBEB',
     borderWidth: 1,
-    borderColor: '#FEF3C7',
+    borderColor: isDark ? '#78350F' : '#FEF3C7',
     borderRadius: 12,
   },
   waitingText: {
-    color: '#D97706',
+    color: isDark ? '#FDE68A' : '#D97706',
     fontSize: 12,
     fontWeight: '700',
   },
@@ -602,14 +607,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     paddingVertical: 10,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: isDark ? '#172554' : '#EFF6FF',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: isDark ? '#1E3A8A' : '#BFDBFE',
     marginBottom: 12,
   },
   navigateBtnText: {
-    color: '#2563EB',
+    color: isDark ? '#60A5FA' : '#2563EB',
     fontSize: 13,
     fontWeight: '700',
   },
@@ -620,11 +625,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#E74C3C',
+    backgroundColor: colors.primary,
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderRadius: 28,
-    shadowColor: '#E74C3C',
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -636,7 +641,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   fabDisabled: {
-    backgroundColor: '#9CA3AF',
-    shadowColor: '#9CA3AF',
+    backgroundColor: colors.iconMuted,
+    shadowColor: colors.iconMuted,
   },
-});
+}), [colors, isDark]);

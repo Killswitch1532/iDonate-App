@@ -1,6 +1,6 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useMemo } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -17,8 +17,11 @@ import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/dat
 import { ThemedText } from "@/components/themed-text";
 import { useAuth } from "@/contexts/AuthContext";
 import { upsertDonorProfile } from "@/services/donorService";
+import { useTheme } from "@/hooks/useTheme";
 
 export default function SignInScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = useStyles(colors, isDark);
   const { signIn, signUp, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -254,7 +257,7 @@ export default function SignInScreen() {
             <MaterialIcons
               name="favorite"
               size={32}
-              color="#E74C3C"
+              color={colors.primary}
               style={styles.heartIcon}
             />
             <ThemedText type="logo" style={styles.logoText}>
@@ -277,13 +280,13 @@ export default function SignInScreen() {
                 <MaterialIcons
                   name="person"
                   size={20}
-                  color="#7F8C8D"
+                  color={colors.icon}
                   style={styles.inputIcon}
                 />
                 <TextInput
                   style={[styles.input, errors.fullName && styles.errorInput]}
                   placeholder="Enter your full name"
-                  placeholderTextColor="#9AA4AB"
+                  placeholderTextColor={colors.textMuted}
                   value={fullName}
                   onChangeText={(text) => {
                     setFullName(text);
@@ -309,13 +312,13 @@ export default function SignInScreen() {
               <MaterialIcons
                 name="email"
                 size={20}
-                color="#7F8C8D"
+                color={colors.icon}
                 style={styles.inputIcon}
               />
               <TextInput
                 style={[styles.input, errors.email && styles.errorInput]}
                 placeholder="Enter your email"
-                placeholderTextColor="#9AA4AB"
+                placeholderTextColor={colors.textMuted}
                 value={email}
                 onChangeText={(text) => {
                   setEmail(text);
@@ -335,9 +338,9 @@ export default function SignInScreen() {
           {isSignUp && (
             <View style={styles.inputGroup}>
               <ThemedText style={styles.label}>
-                Blood Group <ThemedText style={{ color: '#7F8C8D', fontSize: 13, fontWeight: 'normal' }}>(Optional)</ThemedText>
+                Blood Group <ThemedText style={{ color: colors.textSecondary, fontSize: 13, fontWeight: 'normal' }}>(Optional)</ThemedText>
               </ThemedText>
-              <ThemedText style={{ color: '#7F8C8D', fontSize: 13, fontWeight: 'normal' }}>(You can skip if you don't know your blood group)</ThemedText>
+              <ThemedText style={{ color: colors.textSecondary, fontSize: 13, fontWeight: 'normal' }}>(You can skip if you don't know your blood group)</ThemedText>
               <View style={[styles.bloodTypeGrid, { marginTop: 4 }]}>
                 {bloodTypes.map((type) => (
                   <TouchableOpacity
@@ -353,7 +356,7 @@ export default function SignInScreen() {
                     <MaterialIcons
                       name="water-drop"
                       size={16}
-                      color={bloodType === type ? "#FFFFFF" : "#E74C3C"}
+                      color={bloodType === type ? "#FFFFFF" : colors.primary}
                       style={styles.bloodTypeIcon}
                     />
                     <ThemedText
@@ -379,7 +382,7 @@ export default function SignInScreen() {
                 <MaterialIcons
                   name="phone"
                   size={20}
-                  color="#7F8C8D"
+                  color={colors.icon}
                   style={styles.inputIcon}
                 />
                 <TextInput
@@ -388,7 +391,7 @@ export default function SignInScreen() {
                     errors.phoneNumber && styles.errorInput,
                   ]}
                   placeholder="Enter your phone number"
-                  placeholderTextColor="#9AA4AB"
+                  placeholderTextColor={colors.textMuted}
                   value={phoneNumber}
                   onChangeText={(text) => {
                     setPhoneNumber(text);
@@ -422,13 +425,13 @@ export default function SignInScreen() {
                 <MaterialIcons
                   name="calendar-today"
                   size={20}
-                  color="#7F8C8D"
+                  color={colors.icon}
                   style={styles.inputIcon}
                 />
-                <ThemedText style={[styles.input, !dateOfBirth && { color: "#9AA4AB" }]}>
+                <ThemedText style={[styles.input, !dateOfBirth && { color: colors.textMuted }]}>
                   {dateOfBirth ? formatDateForDisplay(dateOfBirth) : "Select your date of birth"}
                 </ThemedText>
-                <MaterialIcons name="arrow-drop-down" size={24} color="#7F8C8D" />
+                <MaterialIcons name="arrow-drop-down" size={24} color={colors.icon} />
               </TouchableOpacity>
               
               {showDatePicker && (
@@ -457,13 +460,13 @@ export default function SignInScreen() {
               <MaterialIcons
                 name="lock"
                 size={20}
-                color="#7F8C8D"
+                color={colors.icon}
                 style={styles.inputIcon}
               />
               <TextInput
                 style={[styles.input, errors.password && styles.errorInput]}
                 placeholder="Enter your password"
-                placeholderTextColor="#9AA4AB"
+                placeholderTextColor={colors.textMuted}
                 value={password}
                 onChangeText={(text) => {
                   setPassword(text);
@@ -480,7 +483,7 @@ export default function SignInScreen() {
                 <MaterialIcons
                   name={showPassword ? "visibility-off" : "visibility"}
                   size={20}
-                  color="#7F8C8D"
+                  color={colors.icon}
                 />
               </TouchableOpacity>
             </View>
@@ -501,7 +504,7 @@ export default function SignInScreen() {
                 <MaterialIcons
                   name="lock"
                   size={20}
-                  color="#7F8C8D"
+                  color={colors.icon}
                   style={styles.inputIcon}
                 />
                 <TextInput
@@ -510,7 +513,7 @@ export default function SignInScreen() {
                     errors.confirmPassword && styles.errorInput,
                   ]}
                   placeholder="Confirm your password"
-                  placeholderTextColor="#9AA4AB"
+                  placeholderTextColor={colors.textMuted}
                   value={confirmPassword}
                   onChangeText={(text) => {
                     setConfirmPassword(text);
@@ -527,7 +530,7 @@ export default function SignInScreen() {
                   <MaterialIcons
                     name={showConfirmPassword ? "visibility-off" : "visibility"}
                     size={20}
-                    color="#7F8C8D"
+                    color={colors.icon}
                   />
                 </TouchableOpacity>
               </View>
@@ -542,13 +545,13 @@ export default function SignInScreen() {
           {/* Submit Button */}
           <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={isLoading}>
             {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={colors.surface} />
             ) : (
               <>
                 <MaterialIcons
                   name="arrow-forward"
                   size={20}
-                  color="#FFFFFF"
+                  color={colors.surface}
                   style={styles.submitIcon}
                 />
                 <ThemedText style={styles.submitText}>
@@ -621,14 +624,14 @@ export default function SignInScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F8F4F4",
+    backgroundColor: colors.background,
   },
   container: {
     flex: 1,
-    backgroundColor: "#F8F4F4",
+    backgroundColor: colors.background,
   },
   contentContainer: {
     padding: 24,
@@ -653,11 +656,11 @@ const styles = StyleSheet.create({
     fontSize: 32,
     lineHeight: 38,
     fontWeight: "bold",
-    color: "#2C3E50",
+    color: colors.textPrimary,
   },
   headerSubtitle: {
     fontSize: 16,
-    color: "#7F8C8D",
+    color: colors.textSecondary,
     textAlign: "center",
   },
 
@@ -671,20 +674,20 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#2C3E50",
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   required: {
-    color: "#E74C3C",
+    color: colors.primary,
     fontSize: 16,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#E5E5E5",
+    borderColor: colors.borderLight,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
@@ -694,17 +697,17 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    color: "#2C3E50",
+    color: colors.textPrimary,
   },
   errorInput: {
-    borderColor: "#E74C3C",
+    borderColor: colors.primary,
   },
   eyeIcon: {
     padding: 4,
   },
   errorText: {
     fontSize: 12,
-    color: "#E74C3C",
+    color: colors.primary,
     marginTop: 4,
   },
 
@@ -715,22 +718,22 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   bloodTypeButton: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
     minWidth: 60,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#E5E5E5",
+    borderColor: colors.borderLight,
     flexDirection: "row",
   },
   selectedBloodTypeButton: {
-    backgroundColor: "#E74C3C",
-    borderColor: "#E74C3C",
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   errorBorder: {
-    borderColor: "#E74C3C",
+    borderColor: colors.primary,
   },
   bloodTypeIcon: {
     marginRight: 4,
@@ -738,7 +741,7 @@ const styles = StyleSheet.create({
   bloodTypeText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#2C3E50",
+    color: colors.textPrimary,
   },
   selectedBloodTypeText: {
     color: "#FFFFFF",
@@ -746,7 +749,7 @@ const styles = StyleSheet.create({
 
   // Submit Button
   submitButton: {
-    backgroundColor: "#E74C3C",
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 16,
     flexDirection: "row",
@@ -754,9 +757,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 24,
     gap: 8,
-    shadowColor: "#000",
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: isDark ? 0.3 : 0.1,
     shadowRadius: 8,
     elevation: 4,
   },
@@ -778,28 +781,28 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: "#E5E5E5",
+    backgroundColor: colors.borderLight,
   },
   dividerText: {
     fontSize: 14,
-    color: "#7F8C8D",
+    color: colors.textSecondary,
     marginHorizontal: 16,
   },
 
   // Google Button
   googleButton: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.card,
     borderRadius: 12,
     paddingVertical: 16,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#E5E5E5",
+    borderColor: colors.borderLight,
     gap: 12,
-    shadowColor: "#000",
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: isDark ? 0.2 : 0.05,
     shadowRadius: 4,
     elevation: 2,
   },
@@ -809,7 +812,7 @@ const styles = StyleSheet.create({
   googleText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#2C3E50",
+    color: colors.textPrimary,
   },
 
   // Toggle
@@ -822,16 +825,16 @@ const styles = StyleSheet.create({
   },
   toggleText: {
     fontSize: 14,
-    color: "#7F8C8D",
+    color: colors.textSecondary,
   },
   toggleLink: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#E74C3C",
+    color: colors.primary,
   },
 
   // Bottom spacer
   bottomSpacer: {
     height: 20,
   },
-});
+}), [colors, isDark]);

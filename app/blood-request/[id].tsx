@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Linking, Image } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -8,6 +8,7 @@ import { isBloodTypeComplete, getDonorProfile, getCooldownStatus } from '@/servi
 import { BloodTypeGatingModal } from '@/components/BloodTypeGatingModal';
 import { ThemedText } from '@/components/themed-text';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '@/hooks/useTheme';
 
 // Visual config per donation status
 const DETAIL_STATUS_CONFIG: Record<DonationStatus, { icon: string; title: string; subtitle: string; iconColor: string; bannerBg: string; bannerBorder: string; titleColor: string; subtitleColor: string; buttonBg: string; buttonBorder: string; buttonTextColor: string; buttonLabel: string }> = {
@@ -51,6 +52,8 @@ const COMPATIBILITY_MAP: Record<string, string[]> = {
 };
 
 export default function BloodRequestDetails() {
+  const { colors, isDark } = useTheme();
+  const styles = useStyles(colors, isDark);
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { user, profile } = useAuth();
@@ -249,7 +252,7 @@ export default function BloodRequestDetails() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#DC2626" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -287,7 +290,7 @@ export default function BloodRequestDetails() {
           </View>
           {request.status === 'completed' ? (
             <View style={styles.progressNote}>
-              <Ionicons name="checkmark-circle" size={14} color="#16A34A" />
+              <Ionicons name="checkmark-circle" size={14} color={colors.success} />
               <ThemedText style={styles.progressNoteText}>This request has been successfully fulfilled!</ThemedText>
             </View>
           ) : (
@@ -315,7 +318,7 @@ export default function BloodRequestDetails() {
                 onPress={() => router.push('/(tabs)/donations')}
               >
                 <Text style={styles.viewDonationsLinkText}>View My Donations</Text>
-                <Ionicons name="arrow-forward" size={14} color="#2563EB" />
+                <Ionicons name="arrow-forward" size={14} color={colors.accent} />
               </TouchableOpacity>
             )}
           </View>
@@ -325,7 +328,7 @@ export default function BloodRequestDetails() {
       {/* Already has an active donation for another request */}
       {!thisRequestStatus && activeDonation && (
         <View style={styles.blockedBanner}>
-          <Ionicons name="information-circle" size={24} color="#D97706" />
+          <Ionicons name="information-circle" size={24} color={colors.warning} />
           <View style={styles.acceptedBannerContent}>
             <Text style={styles.blockedBannerTitle}>You already have an active donation</Text>
             <Text style={styles.blockedBannerSubtitle}>
@@ -339,7 +342,7 @@ export default function BloodRequestDetails() {
               onPress={() => router.push('/(tabs)/donations')}
             >
               <Text style={styles.viewDonationsLinkText}>View My Donations</Text>
-              <Ionicons name="arrow-forward" size={14} color="#2563EB" />
+              <Ionicons name="arrow-forward" size={14} color={colors.accent} />
             </TouchableOpacity>
           </View>
         </View>
@@ -348,7 +351,7 @@ export default function BloodRequestDetails() {
       {/* Cooldown banner */}
       {!cooldownStatus.isEligible && !thisRequestStatus && !activeDonation && (
         <View style={styles.blockedBanner}>
-          <Ionicons name="hourglass-outline" size={24} color="#D97706" />
+          <Ionicons name="hourglass-outline" size={24} color={colors.warning} />
           <View style={styles.acceptedBannerContent}>
             <Text style={styles.blockedBannerTitle}>Donation Cooldown Active</Text>
             <Text style={styles.blockedBannerSubtitle}>
@@ -366,7 +369,7 @@ export default function BloodRequestDetails() {
       {(request.date_needed || request.time_needed) && (
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Ionicons name="calendar" size={20} color="#64748B" />
+            <Ionicons name="calendar" size={20} color={colors.icon} />
             <Text style={styles.cardTitle}>Schedule</Text>
           </View>
           <View style={styles.scheduleRow}>
@@ -389,7 +392,7 @@ export default function BloodRequestDetails() {
       {/* Compatibility Card */}
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <Ionicons name="medical" size={20} color="#DC2626" />
+          <Ionicons name="medical" size={20} color={colors.primary} />
           <Text style={styles.cardTitle}>Compatibility</Text>
         </View>
         <Text style={styles.cardText}>
@@ -400,14 +403,14 @@ export default function BloodRequestDetails() {
           style={styles.chartLink}
         >
           <Text style={styles.chartLinkText}>View Compatibility Chart</Text>
-          <Ionicons name="open-outline" size={14} color="#2563EB" />
+          <Ionicons name="open-outline" size={14} color={colors.accent} />
         </TouchableOpacity>
       </View>
 
       {/* Institution Card */}
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <Ionicons name="business" size={20} color="#64748B" />
+          <Ionicons name="business" size={20} color={colors.icon} />
           <Text style={styles.cardTitle}>Hospital Information</Text>
         </View>
         <Text style={styles.institutionName}>{isOwnRequest ? 'You' : institution.institution_name}</Text>
@@ -417,7 +420,7 @@ export default function BloodRequestDetails() {
             style={styles.phoneLink}
             onPress={() => Linking.openURL(`tel:${institution.phone}`)}
           >
-            <Ionicons name="call" size={16} color="#2563EB" />
+            <Ionicons name="call" size={16} color={colors.accent} />
             <Text style={styles.phoneLinkText}>{institution.phone}</Text>
           </TouchableOpacity>
         )}
@@ -426,7 +429,7 @@ export default function BloodRequestDetails() {
       {request.description && (
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Ionicons name="information-circle-outline" size={20} color="#64748B" />
+            <Ionicons name="information-circle-outline" size={20} color={colors.icon} />
             <Text style={styles.cardTitle}>Description</Text>
           </View>
           <Text style={styles.description}>{request.description}</Text>
@@ -437,7 +440,7 @@ export default function BloodRequestDetails() {
       {requestDonors.length > 0 && (
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Ionicons name="people" size={20} color="#64748B" />
+            <Ionicons name="people" size={20} color={colors.icon} />
             <Text style={styles.cardTitle}>Current Volunteers</Text>
           </View>
           <View style={styles.donorAvatarList}>
@@ -463,7 +466,7 @@ export default function BloodRequestDetails() {
       <View style={styles.actions}>
         {isOwnRequest ? (
           <View style={styles.ownRequestBanner}>
-            <Ionicons name="person-circle" size={24} color="#2563EB" />
+            <Ionicons name="person-circle" size={24} color={colors.accent} />
             <Text style={styles.ownRequestBannerText}>This is your own request</Text>
           </View>
         ) : hasActiveCommitment || isTerminalState ? (
@@ -482,9 +485,9 @@ export default function BloodRequestDetails() {
             disabled={booking || !canAccept}
           >
             {booking ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.surface} />
             ) : acceptanceLoading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.surface} />
             ) : (
               <Text style={styles.acceptButtonText}>
                 {activeDonation ? 'Already Committed' : !cooldownStatus.isEligible ? `Cooldown (${cooldownStatus.daysRemaining}d)` : canReAccept ? 'Accept Again' : 'I want to Donate'}
@@ -521,22 +524,27 @@ function getUrgencyColor(urgency: string) {
   }
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
   },
   content: {
     padding: 20,
     paddingBottom: 40,
   },
   progressCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     padding: 16,
     borderRadius: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.borderLight,
+    shadowColor: colors.shadowColor,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDark ? 0.3 : 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
   progressHeader: {
     flexDirection: 'row',
@@ -546,28 +554,28 @@ const styles = StyleSheet.create({
   progressTitle: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#64748B',
+    color: colors.textSecondary,
   },
   progressCount: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#0F172A',
+    color: colors.textPrimary,
   },
   progressBarBg: {
     height: 10,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#F1F5F9',
     borderRadius: 5,
     overflow: 'hidden',
     marginBottom: 8,
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#16A34A',
+    backgroundColor: colors.success,
     borderRadius: 5,
   },
   progressSubtext: {
     fontSize: 12,
-    color: '#64748B',
+    color: colors.textSecondary,
     fontStyle: 'italic',
   },
   progressNote: {
@@ -577,7 +585,7 @@ const styles = StyleSheet.create({
   },
   progressNoteText: {
     fontSize: 12,
-    color: '#16A34A',
+    color: colors.success,
     fontWeight: 'bold',
   },
   donorAvatarList: {
@@ -590,9 +598,9 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: '#FFFFFF',
+    borderColor: colors.card,
     overflow: 'hidden',
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#F1F5F9',
   },
   miniAvatarImg: {
     width: '100%',
@@ -607,12 +615,12 @@ const styles = StyleSheet.create({
   miniAvatarInitial: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: '#64748B',
+    color: colors.textSecondary,
   },
   volunteerCountText: {
     marginLeft: 12,
     fontSize: 12,
-    color: '#64748B',
+    color: colors.textSecondary,
     fontWeight: '600',
   },
   centered: {
@@ -631,18 +639,18 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   urgencyText: {
-    color: '#fff',
+    color: colors.surface,
     fontSize: 12,
     fontWeight: 'bold',
   },
   bloodType: {
     fontSize: 64,
     fontWeight: '900',
-    color: '#DC2626',
+    color: colors.primary,
   },
   units: {
     fontSize: 18,
-    color: '#64748B',
+    color: colors.textSecondary,
     fontWeight: '600',
   },
 
@@ -672,14 +680,14 @@ const styles = StyleSheet.create({
   // Blocked banner (already has active donation)
   blockedBanner: {
     flexDirection: 'row',
-    backgroundColor: '#FEF3C7',
+    backgroundColor: isDark ? 'rgba(217, 119, 6, 0.2)' : '#FEF3C7',
     padding: 16,
     borderRadius: 16,
     marginBottom: 16,
     alignItems: 'flex-start',
     gap: 12,
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: isDark ? 'rgba(253, 230, 138, 0.3)' : '#FDE68A',
   },
   acceptedBannerContent: {
     flex: 1,
@@ -687,12 +695,12 @@ const styles = StyleSheet.create({
   blockedBannerTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#92400E',
+    color: isDark ? '#FCD34D' : '#92400E',
     marginBottom: 4,
   },
   blockedBannerSubtitle: {
     fontSize: 14,
-    color: '#A16207',
+    color: isDark ? '#FDE68A' : '#A16207',
     lineHeight: 20,
   },
   viewDonationsLink: {
@@ -704,19 +712,21 @@ const styles = StyleSheet.create({
   viewDonationsLinkText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#2563EB',
+    color: colors.accent,
   },
 
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     padding: 16,
     borderRadius: 16,
     marginBottom: 16,
-    shadowColor: '#000',
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: isDark ? 0.3 : 0.05,
     shadowRadius: 10,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -726,13 +736,13 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#64748B',
+    color: colors.textSecondary,
     marginLeft: 8,
     textTransform: 'uppercase',
   },
   cardText: {
     fontSize: 16,
-    color: '#1E293B',
+    color: colors.textPrimary,
     lineHeight: 24,
   },
   chartLink: {
@@ -741,18 +751,18 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   chartLinkText: {
-    color: '#2563EB',
+    color: colors.accent,
     fontWeight: '600',
     marginRight: 4,
   },
   institutionName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1E293B',
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   address: {
-    color: '#64748B',
+    color: colors.textSecondary,
     lineHeight: 20,
   },
   phoneLink: {
@@ -761,13 +771,13 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   phoneLinkText: {
-    color: '#2563EB',
+    color: colors.accent,
     fontWeight: 'bold',
     marginLeft: 6,
   },
   description: {
     fontSize: 15,
-    color: '#475569',
+    color: colors.textPrimary,
     lineHeight: 22,
   },
   scheduleRow: {
@@ -779,28 +789,28 @@ const styles = StyleSheet.create({
   },
   scheduleLabel: {
     fontSize: 12,
-    color: '#64748B',
+    color: colors.textSecondary,
     fontWeight: 'bold',
     textTransform: 'uppercase',
     marginBottom: 4,
   },
   scheduleValue: {
     fontSize: 16,
-    color: '#1E293B',
+    color: colors.textPrimary,
     fontWeight: '600',
   },
   actions: {
     marginTop: 10,
   },
   acceptButton: {
-    backgroundColor: '#DC2626',
+    backgroundColor: colors.primary,
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
     marginBottom: 12,
   },
   acceptButtonText: {
-    color: '#fff',
+    color: colors.surface,
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -819,17 +829,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   disabledButton: {
-    backgroundColor: '#CBD5E1',
+    backgroundColor: colors.borderLight,
   },
   rejectButton: {
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: colors.borderLight,
   },
   rejectButtonText: {
-    color: '#64748B',
+    color: colors.textSecondary,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -837,8 +847,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#DBEAFE',
-    borderColor: '#93C5FD',
+    backgroundColor: isDark ? 'rgba(37, 99, 235, 0.2)' : '#DBEAFE',
+    borderColor: isDark ? 'rgba(147, 197, 253, 0.3)' : '#93C5FD',
     borderWidth: 1,
     padding: 16,
     borderRadius: 12,
@@ -848,6 +858,6 @@ const styles = StyleSheet.create({
   ownRequestBannerText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#1E40AF',
+    color: isDark ? '#93C5FD' : '#1E40AF',
   },
-});
+}), [colors, isDark]);

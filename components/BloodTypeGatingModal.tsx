@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -12,6 +12,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { ThemedText } from './themed-text';
 import { useAuth } from '@/contexts/AuthContext';
 import { upsertDonorProfile } from '@/services/donorService';
+import { useTheme } from '@/hooks/useTheme';
 
 interface BloodTypeGatingModalProps {
   isVisible: boolean;
@@ -23,6 +24,8 @@ const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const GENOTYPES = ['AA', 'AS', 'SS', 'AC', 'SC'];
 
 export function BloodTypeGatingModal({ isVisible, onClose, onSuccess }: BloodTypeGatingModalProps) {
+  const { colors, isDark } = useTheme();
+  const styles = useStyles(colors, isDark);
   const { user, profile, refreshProfile } = useAuth();
   
   const [bloodType, setBloodType] = useState<string | null>(null);
@@ -79,7 +82,7 @@ export function BloodTypeGatingModal({ isVisible, onClose, onSuccess }: BloodTyp
         <View style={styles.modalContainer}>
           <View style={styles.header}>
             <View style={styles.iconContainer}>
-              <MaterialIcons name="water-drop" size={24} color="#E74C3C" />
+              <MaterialIcons name="water-drop" size={24} color={colors.primary} />
             </View>
             <ThemedText style={styles.title}>Complete Your Profile</ThemedText>
             <ThemedText style={styles.subtitle}>
@@ -151,7 +154,7 @@ export function BloodTypeGatingModal({ isVisible, onClose, onSuccess }: BloodTyp
               disabled={isSaving || !bloodType}
             >
               {isSaving ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
+                <ActivityIndicator color={colors.surface} size="small" />
               ) : (
                 <ThemedText style={styles.saveButtonText}>Save & Continue</ThemedText>
               )}
@@ -163,7 +166,7 @@ export function BloodTypeGatingModal({ isVisible, onClose, onSuccess }: BloodTyp
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -172,17 +175,19 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     borderRadius: 24,
     width: '100%',
     maxWidth: 400,
     maxHeight: '90%',
     padding: 24,
-    shadowColor: '#000',
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
+    shadowOpacity: isDark ? 0.3 : 0.2,
     shadowRadius: 20,
     elevation: 10,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   header: {
     alignItems: 'center',
@@ -192,7 +197,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -200,12 +205,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#1E293B',
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: '#64748B',
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -218,7 +223,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#475569',
+    color: colors.textSecondary,
     marginBottom: 12,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -233,22 +238,22 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
+    borderColor: colors.borderLight,
+    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : '#F8FAFC',
     minWidth: 70,
     alignItems: 'center',
   },
   chipSelected: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#E74C3C',
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primary,
   },
   chipText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#64748B',
+    color: colors.textSecondary,
   },
   chipTextSelected: {
-    color: '#E74C3C',
+    color: colors.primary,
   },
   footer: {
     flexDirection: 'row',
@@ -260,16 +265,16 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: colors.borderLight,
   },
   cancelButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#64748B',
+    color: colors.textSecondary,
   },
   saveButton: {
     flex: 2,
-    backgroundColor: '#E74C3C',
+    backgroundColor: colors.primary,
     paddingVertical: 14,
     borderRadius: 14,
     alignItems: 'center',
@@ -281,6 +286,6 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: colors.surface,
   },
-});
+}), [colors, isDark]);

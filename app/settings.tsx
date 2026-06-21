@@ -1,12 +1,15 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import { useTheme } from '@/hooks/useTheme';
 
 export default function SettingsScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = useStyles(colors, isDark);
   const [anonymousDonations, setAnonymousDonations] = useState<boolean>(false);
   const [urgentRequests, setUrgentRequests] = useState<boolean>(false);
   const [messages, setMessages] = useState<boolean>(false);
@@ -34,7 +37,7 @@ export default function SettingsScreen() {
       disabled={!onPress}
     >
       <View style={styles.settingItemContent}>
-        <MaterialIcons name={icon as any} size={20} color="#7F8C8D" style={styles.settingIcon} />
+        <MaterialIcons name={icon as any} size={20} color={colors.icon} style={styles.settingIcon} />
         <View style={styles.settingText}>
           <ThemedText style={styles.settingTitle}>{title}</ThemedText>
           <ThemedText style={styles.settingDescription}>{description}</ThemedText>
@@ -43,7 +46,7 @@ export default function SettingsScreen() {
       <View style={styles.settingRight}>
         {rightElement}
         {showChevron && (
-          <MaterialIcons name="chevron-right" size={18} color="#7F8C8D" style={styles.chevron} />
+          <MaterialIcons name="chevron-right" size={18} color={colors.iconMuted} style={styles.chevron} />
         )}
       </View>
     </TouchableOpacity>
@@ -60,7 +63,7 @@ export default function SettingsScreen() {
   }) => (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <MaterialIcons name={icon as any} size={20} color="#4A90E2" style={styles.sectionIcon} />
+        <MaterialIcons name={icon as any} size={20} color={colors.accent} style={styles.sectionIcon} />
         <ThemedText style={styles.sectionTitle}>{title}</ThemedText>
       </View>
       <View style={styles.sectionContent}>
@@ -78,7 +81,7 @@ export default function SettingsScreen() {
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <MaterialIcons name="arrow-back" size={24} color="#2C3E50" style={styles.backIcon} />
+            <MaterialIcons name="arrow-back" size={24} color={colors.textPrimary} style={styles.backIcon} />
           </TouchableOpacity>
           <View style={styles.headerContent}>
             <ThemedText style={styles.title}>Settings</ThemedText>
@@ -115,7 +118,7 @@ export default function SettingsScreen() {
               <Switch
                 value={anonymousDonations}
                 onValueChange={setAnonymousDonations}
-                trackColor={{ false: '#E8E8E8', true: '#4A90E2' }}
+                trackColor={{ false: colors.borderLight, true: colors.accent }}
                 thumbColor={anonymousDonations ? '#FFFFFF' : '#FFFFFF'}
               />
             }
@@ -132,7 +135,7 @@ export default function SettingsScreen() {
               <Switch
                 value={urgentRequests}
                 onValueChange={setUrgentRequests}
-                trackColor={{ false: '#E8E8E8', true: '#4A90E2' }}
+                trackColor={{ false: colors.borderLight, true: colors.accent }}
                 thumbColor={urgentRequests ? '#FFFFFF' : '#FFFFFF'}
               />
             }
@@ -145,7 +148,7 @@ export default function SettingsScreen() {
               <Switch
                 value={messages}
                 onValueChange={setMessages}
-                trackColor={{ false: '#E8E8E8', true: '#4A90E2' }}
+                trackColor={{ false: colors.borderLight, true: colors.accent }}
                 thumbColor={messages ? '#FFFFFF' : '#FFFFFF'}
               />
             }
@@ -158,7 +161,7 @@ export default function SettingsScreen() {
               <Switch
                 value={donationReminders}
                 onValueChange={setDonationReminders}
-                trackColor={{ false: '#E8E8E8', true: '#4A90E2' }}
+                trackColor={{ false: colors.borderLight, true: colors.accent }}
                 thumbColor={donationReminders ? '#FFFFFF' : '#FFFFFF'}
               />
             }
@@ -189,7 +192,7 @@ export default function SettingsScreen() {
               <Switch
                 value={biometricLogin}
                 onValueChange={setBiometricLogin}
-                trackColor={{ false: '#E8E8E8', true: '#4A90E2' }}
+                trackColor={{ false: colors.borderLight, true: colors.accent }}
                 thumbColor={biometricLogin ? '#FFFFFF' : '#FFFFFF'}
               />
             }
@@ -221,14 +224,14 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F8F4F4',
+    backgroundColor: colors.background,
   },
   container: {
     flex: 1,
-    backgroundColor: '#F8F4F4',
+    backgroundColor: colors.background,
   },
   contentContainer: {
     padding: 16,
@@ -253,24 +256,26 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#2C3E50',
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 16,
-    color: '#7F8C8D',
+    color: colors.textSecondary,
   },
 
   // Section
   section: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     borderRadius: 16,
     marginBottom: 16,
-    shadowColor: '#000',
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: isDark ? 0.3 : 0.1,
     shadowRadius: 8,
     elevation: 4,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -285,7 +290,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#2C3E50',
+    color: colors.textPrimary,
   },
   sectionContent: {
     paddingHorizontal: 20,
@@ -299,7 +304,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.borderLight,
   },
   settingItemContent: {
     flexDirection: 'row',
@@ -317,12 +322,12 @@ const styles = StyleSheet.create({
   settingTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2C3E50',
+    color: colors.textPrimary,
     marginBottom: 2,
   },
   settingDescription: {
     fontSize: 14,
-    color: '#7F8C8D',
+    color: colors.textSecondary,
     lineHeight: 18,
   },
   settingRight: {
@@ -336,14 +341,14 @@ const styles = StyleSheet.create({
 
   // Radius Pill
   radiusPill: {
-    backgroundColor: '#F0F0F0',
+    backgroundColor: colors.borderLight,
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
   radiusText: {
     fontSize: 12,
-    color: '#7F8C8D',
+    color: colors.textSecondary,
     fontWeight: '600',
   },
 
@@ -351,4 +356,4 @@ const styles = StyleSheet.create({
   bottomSpacer: {
     height: 20,
   },
-});
+}), [colors, isDark]);

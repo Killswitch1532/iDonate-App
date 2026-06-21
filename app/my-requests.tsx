@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, View, TouchableOpacity, Alert, Image, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, router } from "expo-router";
@@ -8,8 +8,11 @@ import { ThemedText } from "@/components/themed-text";
 import { useAuth } from "@/contexts/AuthContext";
 import { confirmRecipientDonation } from "@/services/donationService";
 import { getUserRequestsWithDonors, updateRequestStatus } from "@/services/requestService";
+import { useTheme } from '@/hooks/useTheme';
 
 export default function MyRequestsScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = useStyles(colors, isDark);
   const { user } = useAuth();
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,15 +103,15 @@ export default function MyRequestsScreen() {
       <ScrollView 
         style={styles.container} 
         contentContainerStyle={styles.contentContainer}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#DC2626"]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
       >
         {loading && !refreshing ? (
           <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color="#DC2626" />
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : requests.length === 0 ? (
           <View style={styles.centerContainer}>
-            <MaterialIcons name="bloodtype" size={64} color="#CBD5E1" />
+            <MaterialIcons name="bloodtype" size={64} color={colors.icon} />
             <ThemedText style={styles.emptyText}>No requests created yet</ThemedText>
             <ThemedText style={styles.emptySubtext}>
               When you create a blood request, it will appear here so you can track responses.
@@ -160,7 +163,7 @@ export default function MyRequestsScreen() {
                             {donation.donor?.avatar_url ? (
                               <Image source={{ uri: donation.donor.avatar_url }} style={styles.avatarImg} />
                             ) : (
-                              <Ionicons name="person" size={16} color="#94A3B8" />
+                              <Ionicons name="person" size={16} color={colors.icon} />
                             )}
                           </View>
                           <View style={styles.donorInfo}>
@@ -168,17 +171,17 @@ export default function MyRequestsScreen() {
                             <View style={styles.donorStatusRow}>
                               {donation.status === 'completed' ? (
                                 <View style={styles.inlineBadgeSuccess}>
-                                  <Ionicons name="checkmark-circle" size={12} color="#16A34A" />
+                                  <Ionicons name="checkmark-circle" size={12} color={colors.success} />
                                   <ThemedText style={styles.inlineBadgeTextSuccess}>Donation Complete</ThemedText>
                                 </View>
                               ) : donation.recipient_confirmed ? (
                                 <View style={styles.inlineBadgeWarning}>
-                                  <Ionicons name="time" size={12} color="#D97706" />
+                                  <Ionicons name="time" size={12} color={colors.warning} />
                                   <ThemedText style={styles.inlineBadgeTextWarning}>Waiting for Donor</ThemedText>
                                 </View>
                               ) : (
                                 <View style={styles.inlineBadgeInfo}>
-                                  <Ionicons name="calendar" size={12} color="#2563EB" />
+                                  <Ionicons name="calendar" size={12} color={colors.accent} />
                                   <ThemedText style={styles.inlineBadgeTextInfo}>{donation.status.toUpperCase()}</ThemedText>
                                 </View>
                               )}
@@ -194,7 +197,7 @@ export default function MyRequestsScreen() {
                                 disabled={actionId === donation.id}
                               >
                                 {actionId === donation.id ? (
-                                  <ActivityIndicator size="small" color="#FFFFFF" />
+                                  <ActivityIndicator size="small" color={colors.surface} />
                                 ) : (
                                   <ThemedText style={styles.miniConfirmBtnText}>Confirm</ThemedText>
                                 )}
@@ -214,7 +217,7 @@ export default function MyRequestsScreen() {
                         onPress={() => handleCompleteRequest(request.id)}
                         disabled={actionId === request.id}
                       >
-                        {actionId === request.id ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ThemedText style={styles.completeBtnText}>Mark Request as Fulfilled</ThemedText>}
+                        {actionId === request.id ? <ActivityIndicator size="small" color={colors.surface} /> : <ThemedText style={styles.completeBtnText}>Mark Request as Fulfilled</ThemedText>}
                       </TouchableOpacity>
                     </View>
                   )}
@@ -228,47 +231,47 @@ export default function MyRequestsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F8FAFC' },
+const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: colors.background },
   container: { flex: 1 },
   contentContainer: { padding: 16, paddingBottom: 40 },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 100 },
-  emptyText: { fontSize: 18, fontWeight: 'bold', color: '#1E293B', marginTop: 16 },
-  emptySubtext: { fontSize: 14, color: '#64748B', textAlign: 'center', marginTop: 8, maxWidth: '80%', marginBottom: 24 },
-  createBtn: { backgroundColor: '#DC2626', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
-  createBtnText: { color: '#FFFFFF', fontWeight: 'bold' },
+  emptyText: { fontSize: 18, fontWeight: 'bold', color: colors.textPrimary, marginTop: 16 },
+  emptySubtext: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginTop: 8, maxWidth: '80%', marginBottom: 24 },
+  createBtn: { backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
+  createBtnText: { color: colors.surface, fontWeight: 'bold' },
   listContainer: { gap: 16 },
-  requestCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 },
+  requestCard: { backgroundColor: colors.card, borderRadius: 20, padding: 16, shadowColor: colors.shadowColor, shadowOffset: { width: 0, height: 2 }, shadowOpacity: isDark ? 0.3 : 0.05, shadowRadius: 10, elevation: 3, borderWidth: 1, borderColor: colors.borderLight },
   requestHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  bloodType: { fontSize: 24, fontWeight: '900', color: '#DC2626' },
-  patientName: { fontSize: 16, fontWeight: 'bold', color: '#0F172A', marginTop: 2 },
+  bloodType: { fontSize: 24, fontWeight: '900', color: colors.primary },
+  patientName: { fontSize: 16, fontWeight: 'bold', color: colors.textPrimary, marginTop: 2 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   statusText: { fontSize: 10, fontWeight: 'bold' },
   progressSection: { marginBottom: 20 },
   progressLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  progressLabel: { fontSize: 12, fontWeight: '700', color: '#64748B' },
-  progressValue: { fontSize: 12, fontWeight: 'bold', color: '#0F172A' },
-  progressBarBg: { height: 8, backgroundColor: '#F1F5F9', borderRadius: 4, overflow: 'hidden' },
-  progressBarFill: { height: '100%', backgroundColor: '#16A34A', borderRadius: 4 },
-  donorsList: { backgroundColor: '#F8FAFC', borderRadius: 16, padding: 12 },
-  sectionTitle: { fontSize: 14, fontWeight: 'bold', color: '#475569', marginBottom: 12 },
-  noneText: { fontSize: 13, color: '#94A3B8', fontStyle: 'italic', textAlign: 'center', paddingVertical: 8 },
-  donorRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  donorAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center', marginRight: 10, overflow: 'hidden' },
+  progressLabel: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
+  progressValue: { fontSize: 12, fontWeight: 'bold', color: colors.textPrimary },
+  progressBarBg: { height: 8, backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#F1F5F9', borderRadius: 4, overflow: 'hidden' },
+  progressBarFill: { height: '100%', backgroundColor: colors.success, borderRadius: 4 },
+  donorsList: { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : '#F8FAFC', borderRadius: 16, padding: 12 },
+  sectionTitle: { fontSize: 14, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 12 },
+  noneText: { fontSize: 13, color: colors.textSecondary, fontStyle: 'italic', textAlign: 'center', paddingVertical: 8 },
+  donorRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
+  donorAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : '#E2E8F0', alignItems: 'center', justifyContent: 'center', marginRight: 10, overflow: 'hidden' },
   avatarImg: { width: '100%', height: '100%' },
   donorInfo: { flex: 1 },
-  donorName: { fontSize: 14, fontWeight: 'bold', color: '#1E293B' },
+  donorName: { fontSize: 14, fontWeight: 'bold', color: colors.textPrimary },
   donorStatusRow: { flexDirection: 'row', marginTop: 2 },
   inlineBadgeSuccess: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  inlineBadgeTextSuccess: { fontSize: 11, color: '#16A34A', fontWeight: '700' },
+  inlineBadgeTextSuccess: { fontSize: 11, color: colors.success, fontWeight: '700' },
   inlineBadgeWarning: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  inlineBadgeTextWarning: { fontSize: 11, color: '#D97706', fontWeight: '700' },
+  inlineBadgeTextWarning: { fontSize: 11, color: colors.warning, fontWeight: '700' },
   inlineBadgeInfo: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  inlineBadgeTextInfo: { fontSize: 11, color: '#2563EB', fontWeight: '700' },
+  inlineBadgeTextInfo: { fontSize: 11, color: colors.accent, fontWeight: '700' },
   donorActions: { marginLeft: 8 },
-  miniConfirmBtn: { backgroundColor: '#16A34A', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  miniConfirmBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' },
-  requestActions: { marginTop: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 16 },
-  completeBtn: { backgroundColor: '#0F172A', paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
-  completeBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
-});
+  miniConfirmBtn: { backgroundColor: colors.success, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  miniConfirmBtnText: { color: colors.surface, fontSize: 12, fontWeight: 'bold' },
+  requestActions: { marginTop: 16, borderTopWidth: 1, borderTopColor: colors.borderLight, paddingTop: 16 },
+  completeBtn: { backgroundColor: colors.textPrimary, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
+  completeBtnText: { color: colors.background, fontWeight: 'bold', fontSize: 14 },
+}), [colors, isDark]);

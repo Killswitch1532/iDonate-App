@@ -1,9 +1,6 @@
 import { StyleSheet, Text } from "react-native";
 import type { TextStyle, TextProps } from "react-native";
-
-
-import { useThemeColor } from "@/hooks/use-theme-color";
-
+import { useTheme } from "@/hooks/useTheme";
 export type ThemedTextProps = TextProps & {
   lightColor?: string;
   darkColor?: string;
@@ -24,7 +21,12 @@ export function ThemedText({
   type = "default",
   ...rest
 }: ThemedTextProps) {
-  const color = useThemeColor({ light: lightColor, dark: darkColor }, "text");
+  const { colors, isDark } = useTheme();
+
+  let color = isDark ? (darkColor || colors.textPrimary) : (lightColor || colors.textPrimary);
+  if (type === 'link' && !lightColor && !darkColor) {
+    color = colors.accent;
+  }
 
   // Resolve passed style to allow sensible defaults (e.g. auto lineHeight)
   const resolved = StyleSheet.flatten(style) as TextStyle | undefined;
@@ -76,7 +78,6 @@ const styles = StyleSheet.create({
   link: {
     lineHeight: 30,
     fontSize: 16,
-    color: "#0a7ea4",
   },
   logo: {
     fontSize: 32,

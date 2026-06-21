@@ -1,6 +1,6 @@
 import { ThemedText } from "@/components/themed-text";
-import { useThemeColor } from "@/hooks/use-theme-color";
-import React from "react";
+import { useTheme } from "@/hooks/useTheme";
+import React, { useMemo } from "react";
 import {
     StyleSheet,
     TouchableOpacity,
@@ -18,17 +18,16 @@ export default function Button({
   children,
   ...rest
 }: ButtonProps) {
-  const primary = useThemeColor({}, "primary");
-  const accent = useThemeColor({}, "accent");
-  const surface = useThemeColor({}, "surface");
+  const { colors, isDark } = useTheme();
+  const styles = useStyles(colors, isDark);
 
   const backgroundColor =
     variant === "primary"
-      ? primary
+      ? colors.primary
       : variant === "secondary"
-        ? accent
-        : surface;
-  const textColor = variant === "primary" ? "#FFFFFF" : "#2C3E50";
+        ? colors.accent
+        : colors.surface;
+  const textColor = variant === "primary" ? colors.surface : colors.textPrimary;
 
   return (
     <TouchableOpacity
@@ -47,16 +46,16 @@ export default function Button({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.create({
   button: {
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 16,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
+    shadowOpacity: isDark ? 0.2 : 0.06,
     shadowRadius: 4,
     elevation: 2,
   },
@@ -64,4 +63,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
   },
-});
+}), [colors, isDark]);

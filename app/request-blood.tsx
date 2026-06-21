@@ -2,7 +2,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Location from 'expo-location';
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -20,8 +20,11 @@ import { createBloodRequest } from "@/services/requestService";
 import { isBloodTypeComplete } from "@/services/donorService";
 import { BloodTypeGatingModal } from "@/components/BloodTypeGatingModal";
 import { Institution, getInstitutions } from "@/services/institutionService";
+import { useTheme } from '@/hooks/useTheme';
 
 export default function RequestBloodScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = useStyles(colors, isDark);
   const { user, profile } = useAuth();
   
   const [selectedBloodType, setSelectedBloodType] = useState<string>("");
@@ -224,7 +227,7 @@ export default function RequestBloodScreen() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <MaterialIcons name="arrow-back" size={24} color="#2C3E50" />
+            <MaterialIcons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <View style={styles.headerContent}>
             <ThemedText type="display" style={styles.appName}>iDonate</ThemedText>
@@ -255,7 +258,7 @@ export default function RequestBloodScreen() {
                   if (errors.bloodType) setErrors((prev) => ({ ...prev, bloodType: "" }));
                 }}
               >
-                <MaterialIcons name="water-drop" size={16} color={selectedBloodType === type ? "#FFFFFF" : "#E74C3C"} style={{ marginRight: 4 }} />
+                <MaterialIcons name="water-drop" size={16} color={selectedBloodType === type ? colors.surface : colors.primary} style={{ marginRight: 4 }} />
                 <ThemedText style={[styles.bloodTypeText, selectedBloodType === type && styles.selectedBloodTypeText]}>{type}</ThemedText>
               </TouchableOpacity>
             ))}
@@ -283,7 +286,7 @@ export default function RequestBloodScreen() {
                 <MaterialIcons
                   name={option.value === "critical" || option.value === "high" ? "warning" : option.value === "moderate" ? "schedule" : "event"}
                   size={14}
-                  color={selectedUrgency === option.value ? "#FFFFFF" : option.value === "critical" ? "#E74C3C" : "#4A90E2"}
+                  color={selectedUrgency === option.value ? colors.surface : option.value === "critical" ? colors.primary : colors.accent}
                   style={{ marginRight: 4 }}
                 />
                 <ThemedText style={[styles.urgencyText, selectedUrgency === option.value && styles.selectedUrgencyText]}>
@@ -300,11 +303,11 @@ export default function RequestBloodScreen() {
           <ThemedText style={styles.label}>Number of donors needed</ThemedText>
           <ThemedText style={styles.subtitle}>How many people do you need to donate? (Default is 1)</ThemedText>
           <View style={[styles.inputContainer, { marginTop: 12 }]}>
-            <MaterialIcons name="people" size={20} color="#7F8C8D" style={styles.inputIcon} />
+            <MaterialIcons name="people" size={20} color={colors.icon} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
               placeholder="e.g. 1"
-              placeholderTextColor="#9AA4AB"
+              placeholderTextColor={colors.textSecondary}
               value={maxDonors}
               onChangeText={(text) => setMaxDonors(text.replace(/[^0-9]/g, ""))}
               keyboardType="number-pad"
@@ -317,20 +320,20 @@ export default function RequestBloodScreen() {
           <ThemedText style={styles.label}>Date & time needed</ThemedText>
           <View style={styles.dateTimeRow}>
             <TouchableOpacity style={styles.dateTimeButton} onPress={() => setShowDatePicker(true)}>
-              <MaterialIcons name="calendar-today" size={20} color="#4A90E2" style={{ marginRight: 8 }} />
+              <MaterialIcons name="calendar-today" size={20} color={colors.accent} style={{ marginRight: 8 }} />
               <View style={{ flex: 1 }}>
                 <ThemedText style={styles.dateTimeLabel}>Date</ThemedText>
                 <ThemedText style={styles.dateTimeValue}>{formatDate(selectedDate)}</ThemedText>
               </View>
-              <MaterialIcons name="chevron-right" size={20} color="#7F8C8D" />
+              <MaterialIcons name="chevron-right" size={20} color={colors.icon} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.dateTimeButton} onPress={() => setShowTimePicker(true)}>
-              <MaterialIcons name="access-time" size={20} color="#4A90E2" style={{ marginRight: 8 }} />
+              <MaterialIcons name="access-time" size={20} color={colors.accent} style={{ marginRight: 8 }} />
               <View style={{ flex: 1 }}>
                 <ThemedText style={styles.dateTimeLabel}>Time</ThemedText>
                 <ThemedText style={styles.dateTimeValue}>{formatTime(selectedTime)}</ThemedText>
               </View>
-              <MaterialIcons name="chevron-right" size={20} color="#7F8C8D" />
+              <MaterialIcons name="chevron-right" size={20} color={colors.icon} />
             </TouchableOpacity>
           </View>
           {showDatePicker && <DateTimePicker value={selectedDate} mode="date" display="default" onChange={(e, d) => { setShowDatePicker(false); if(d) setSelectedDate(d); }} minimumDate={new Date()} />}
@@ -341,11 +344,11 @@ export default function RequestBloodScreen() {
         <View style={styles.card}>
           <ThemedText style={styles.label}>Alternative contact (phone)</ThemedText>
           <View style={styles.inputContainer}>
-            <MaterialIcons name="phone" size={20} color="#7F8C8D" style={styles.inputIcon} />
+            <MaterialIcons name="phone" size={20} color={colors.icon} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
               placeholder="e.g. +1 234 567 8900 (Optional)"
-              placeholderTextColor="#9AA4AB"
+              placeholderTextColor={colors.textSecondary}
               value={contactPhone}
               onChangeText={setContactPhone}
               keyboardType="phone-pad"
@@ -358,8 +361,8 @@ export default function RequestBloodScreen() {
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <ThemedText style={styles.label}>Location <ThemedText style={styles.required}>*</ThemedText></ThemedText>
             <TouchableOpacity onPress={handleGetLocation} disabled={isLocating} style={{ flexDirection: 'row', alignItems: 'center' }}>
-              {isLocating ? <ActivityIndicator size="small" color="#E74C3C" /> : <MaterialIcons name="my-location" size={16} color="#E74C3C" />}
-              <ThemedText style={{ color: "#E74C3C", fontSize: 12, fontWeight: '600', marginLeft: 4 }}>{isLocating ? 'Locating...' : 'Get current'}</ThemedText>
+              {isLocating ? <ActivityIndicator size="small" color={colors.primary} /> : <MaterialIcons name="my-location" size={16} color={colors.primary} />}
+              <ThemedText style={{ color: colors.primary, fontSize: 12, fontWeight: '600', marginLeft: 4 }}>{isLocating ? 'Locating...' : 'Get current'}</ThemedText>
             </TouchableOpacity>
           </View>
 
@@ -367,7 +370,7 @@ export default function RequestBloodScreen() {
           
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.centersScroll}>
             {loadingCenters ? (
-              <ActivityIndicator color="#E74C3C" />
+              <ActivityIndicator color={colors.primary} />
             ) : (
               <>
                 {centers.map((center) => (
@@ -413,11 +416,11 @@ export default function RequestBloodScreen() {
 
           {isOtherSelected && (
             <View style={[styles.inputContainer, { marginTop: 12 }]}>
-              <MaterialIcons name="location-city" size={20} color="#7F8C8D" style={styles.inputIcon} />
+              <MaterialIcons name="location-city" size={20} color={colors.icon} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Enter center or address"
-                placeholderTextColor="#9AA4AB"
+                placeholderTextColor={colors.textSecondary}
                 value={locationText}
                 onChangeText={setLocationText}
                 autoFocus
@@ -430,11 +433,11 @@ export default function RequestBloodScreen() {
         <View style={styles.card}>
           <ThemedText style={styles.label}>Reason for Request <ThemedText style={styles.required}>*</ThemedText></ThemedText>
           <View style={[styles.inputContainer, { alignItems: 'flex-start', paddingTop: 10 }]}>
-            <MaterialIcons name="assignment" size={20} color="#7F8C8D" style={styles.inputIcon} />
+            <MaterialIcons name="assignment" size={20} color={colors.icon} style={styles.inputIcon} />
             <TextInput
               style={[styles.input, styles.textArea, errors.purpose && styles.errorInput]}
               placeholder="Surgery, accident victim, thalassemia patient..."
-              placeholderTextColor="#9AA4AB"
+              placeholderTextColor={colors.textSecondary}
               value={purpose}
               onChangeText={(text) => {
                 setPurpose(text);
@@ -451,10 +454,10 @@ export default function RequestBloodScreen() {
         <View style={styles.bottomButtons}>
           <TouchableOpacity style={styles.continueButton} onPress={handleSubmit} disabled={isSubmitting}>
             {isSubmitting ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
+              <ActivityIndicator color={colors.surface} size="small" />
             ) : (
               <>
-                <MaterialIcons name="check-circle" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                <MaterialIcons name="check-circle" size={20} color={colors.surface} style={{ marginRight: 8 }} />
                 <ThemedText style={styles.continueText}>Submit Request</ThemedText>
               </>
             )}
@@ -476,48 +479,48 @@ export default function RequestBloodScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#F8F4F4" },
-  container: { flex: 1, backgroundColor: "#F8F4F4" },
+const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: colors.background },
   contentContainer: { padding: 16, paddingBottom: 60 },
   header: { flexDirection: "row", alignItems: "center", marginBottom: 24 },
   backButton: { marginRight: 16 },
   headerContent: { flex: 1 },
-  appName: { fontSize: 20, fontWeight: "bold", color: "#2C3E50" },
-  headerSubtitle: { fontSize: 14, color: "#7F8C8D" },
+  appName: { fontSize: 20, fontWeight: "bold", color: colors.textPrimary },
+  headerSubtitle: { fontSize: 14, color: colors.textSecondary },
   titleSection: { marginBottom: 24 },
-  title: { fontSize: 24, fontWeight: "bold", color: "#2C3E50", marginBottom: 8 },
-  subtitle: { fontSize: 14, color: "#7F8C8D", lineHeight: 20 },
-  card: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 16, marginBottom: 16, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-  label: { fontSize: 16, fontWeight: "600", color: "#2C3E50", marginBottom: 12 },
-  required: { color: "#E74C3C", fontSize: 16 },
-  inputContainer: { flexDirection: "row", alignItems: "center", backgroundColor: "#F8F4F4", borderRadius: 8, borderWidth: 1, borderColor: "#E5E5E5", paddingHorizontal: 12 },
+  title: { fontSize: 24, fontWeight: "bold", color: colors.textPrimary, marginBottom: 8 },
+  subtitle: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
+  card: { backgroundColor: colors.card, borderRadius: 12, padding: 16, marginBottom: 16, shadowColor: colors.shadowColor, shadowOffset: { width: 0, height: 1 }, shadowOpacity: isDark ? 0.3 : 0.05, shadowRadius: 4, elevation: 2, borderWidth: 1, borderColor: colors.borderLight },
+  label: { fontSize: 16, fontWeight: "600", color: colors.textPrimary, marginBottom: 12 },
+  required: { color: colors.primary, fontSize: 16 },
+  inputContainer: { flexDirection: "row", alignItems: "center", backgroundColor: colors.background, borderRadius: 8, borderWidth: 1, borderColor: colors.borderLight, paddingHorizontal: 12 },
   inputIcon: { marginRight: 12 },
-  input: { flex: 1, paddingVertical: 12, fontSize: 16, color: "#2C3E50" },
-  errorInput: { borderColor: "#E74C3C" },
+  input: { flex: 1, paddingVertical: 12, fontSize: 16, color: colors.textPrimary },
+  errorInput: { borderColor: colors.primary },
   textArea: { height: 70, textAlignVertical: "top" },
-  errorText: { fontSize: 12, color: "#E74C3C", marginTop: 4 },
+  errorText: { fontSize: 12, color: colors.primary, marginTop: 4 },
   bloodTypeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  bloodTypeButton: { backgroundColor: "#F8F4F4", borderRadius: 8, paddingHorizontal: 16, paddingVertical: 12, minWidth: 60, alignItems: "center", borderWidth: 1, borderColor: "#E5E5E5", flexDirection: "row" },
-  selectedBloodTypeButton: { backgroundColor: "#E74C3C", borderColor: "#E74C3C" },
-  errorBorder: { borderColor: "#E74C3C" },
-  bloodTypeText: { fontSize: 14, fontWeight: "600", color: "#2C3E50" },
-  selectedBloodTypeText: { color: "#FFFFFF" },
+  bloodTypeButton: { backgroundColor: colors.background, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 12, minWidth: 60, alignItems: "center", borderWidth: 1, borderColor: colors.borderLight, flexDirection: "row" },
+  selectedBloodTypeButton: { backgroundColor: colors.primary, borderColor: colors.primary },
+  errorBorder: { borderColor: colors.primary },
+  bloodTypeText: { fontSize: 14, fontWeight: "600", color: colors.textPrimary },
+  selectedBloodTypeText: { color: colors.surface },
   urgencyButtons: { flexDirection: "row", gap: 8 },
-  urgencyButton: { backgroundColor: "#F8F4F4", borderRadius: 8, paddingHorizontal: 4, paddingVertical: 12, flex: 1, alignItems: "center", borderWidth: 1, borderColor: "#E5E5E5", flexDirection: "row", justifyContent: "center" },
-  selectedUrgencyButton: { backgroundColor: "#E74C3C", borderColor: "#E74C3C" },
-  urgencyText: { fontSize: 12, fontWeight: "600", color: "#2C3E50" },
-  selectedUrgencyText: { color: "#FFFFFF" },
+  urgencyButton: { backgroundColor: colors.background, borderRadius: 8, paddingHorizontal: 4, paddingVertical: 12, flex: 1, alignItems: "center", borderWidth: 1, borderColor: colors.borderLight, flexDirection: "row", justifyContent: "center" },
+  selectedUrgencyButton: { backgroundColor: colors.primary, borderColor: colors.primary },
+  urgencyText: { fontSize: 12, fontWeight: "600", color: colors.textPrimary },
+  selectedUrgencyText: { color: colors.surface },
   dateTimeRow: { flexDirection: "row", gap: 12 },
-  dateTimeButton: { flex: 1, backgroundColor: "#F8F4F4", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12, borderWidth: 1, borderColor: "#E5E5E5", flexDirection: "row", alignItems: "center" },
-  dateTimeLabel: { fontSize: 12, color: "#7F8C8D", marginBottom: 2 },
-  dateTimeValue: { fontSize: 14, fontWeight: "600", color: "#2C3E50" },
+  dateTimeButton: { flex: 1, backgroundColor: colors.background, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12, borderWidth: 1, borderColor: colors.borderLight, flexDirection: "row", alignItems: "center" },
+  dateTimeLabel: { fontSize: 12, color: colors.textSecondary, marginBottom: 2 },
+  dateTimeValue: { fontSize: 14, fontWeight: "600", color: colors.textPrimary },
   centersScroll: { marginTop: 12, marginBottom: 4 },
-  centerOption: { backgroundColor: "#F8F4F4", borderRadius: 8, paddingHorizontal: 16, paddingVertical: 10, marginRight: 8, borderWidth: 1, borderColor: "#E5E5E5", marginBottom: 8 },
-  selectedCenterOption: { backgroundColor: "#E74C3C", borderColor: "#E74C3C" },
-  centerOptionText: { fontSize: 13, fontWeight: "600", color: "#2C3E50" },
-  selectedCenterOptionText: { color: "#FFFFFF" },
+  centerOption: { backgroundColor: colors.background, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 10, marginRight: 8, borderWidth: 1, borderColor: colors.borderLight, marginBottom: 8 },
+  selectedCenterOption: { backgroundColor: colors.primary, borderColor: colors.primary },
+  centerOptionText: { fontSize: 13, fontWeight: "600", color: colors.textPrimary },
+  selectedCenterOptionText: { color: colors.surface },
   bottomButtons: { flexDirection: "row", gap: 12, marginTop: 16 },
-  continueButton: { flex: 1, backgroundColor: "#E74C3C", borderRadius: 12, paddingVertical: 16, alignItems: "center", flexDirection: "row", justifyContent: "center" },
-  continueText: { fontSize: 16, fontWeight: "600", color: "#FFFFFF" }
-});
+  continueButton: { flex: 1, backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 16, alignItems: "center", flexDirection: "row", justifyContent: "center" },
+  continueText: { fontSize: 16, fontWeight: "600", color: colors.surface }
+}), [colors, isDark]);

@@ -1,14 +1,17 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '@/hooks/useTheme';
 
 
 const { height, width } = Dimensions.get('window');
 
 export default function OnboardingScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = useStyles(colors, isDark);
   const [currentPage, setCurrentPage] = useState(0);
 
   const onboardingData = [
@@ -128,7 +131,7 @@ export default function OnboardingScreen() {
                   style={[
                     styles.pageIndicator,
                     index === currentPage && styles.activePageIndicator,
-                    { backgroundColor: index === currentPage ? '#E74C3C' : '#E5E5E5' }
+                    { backgroundColor: index === currentPage ? colors.primary : colors.borderLight }
                   ]}
                 />
               ))}
@@ -141,13 +144,13 @@ export default function OnboardingScreen() {
                    style={styles.backButton}
                    onPress={() => setCurrentPage(currentPage - 1)}
                  >
-                   <MaterialIcons name="arrow-back" size={20} color="#7F8C8D" />
+                   <MaterialIcons name="arrow-back" size={20} color={colors.icon} />
                    <Text style={styles.backButtonText}>Back</Text>
                  </TouchableOpacity>
                )}
                
                <TouchableOpacity
-                 style={[styles.nextButton, { backgroundColor: '#E74C3C' }]}
+                 style={[styles.nextButton, { backgroundColor: colors.primary }]}
                  onPress={nextPage}
                >
                  <Text style={styles.nextButtonText}>
@@ -163,7 +166,7 @@ export default function OnboardingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -201,17 +204,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 25,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    shadowColor: '#000',
+    backgroundColor: isDark ? 'rgba(30, 41, 59, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: isDark ? 0.3 : 0.1,
     shadowRadius: 8,
     elevation: 4,
   },
   skipText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2C3E50',
+    color: colors.textPrimary,
     fontFamily: 'System',
   },
 
@@ -255,20 +258,20 @@ const styles = StyleSheet.create({
     fontFamily: 'System',
   },
   tipContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: isDark ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.95)',
     borderRadius: 20,
     padding: 20,
     borderLeftWidth: 5,
-    borderLeftColor: '#E74C3C',
-    shadowColor: '#000',
+    borderLeftColor: colors.primary,
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: isDark ? 0.3 : 0.1,
     shadowRadius: 12,
     elevation: 8,
   },
   tipText: {
     fontSize: 15,
-    color: '#2C3E50',
+    color: colors.textPrimary,
     fontStyle: 'italic',
     lineHeight: 22,
     fontWeight: '500',
@@ -304,18 +307,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: isDark ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.95)',
     gap: 8,
-    shadowColor: '#000',
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: isDark ? 0.3 : 0.1,
     shadowRadius: 8,
     elevation: 4,
   },
   backButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#7F8C8D',
+    color: colors.textSecondary,
     fontFamily: 'System',
   },
   nextButton: {
@@ -325,16 +328,16 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     borderRadius: 30,
     gap: 10,
-    shadowColor: '#000',
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: isDark ? 0.3 : 0.2,
     shadowRadius: 12,
     elevation: 8,
   },
   nextButtonText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: colors.surface,
     fontFamily: 'System',
   },
-});
+}), [colors, isDark]);

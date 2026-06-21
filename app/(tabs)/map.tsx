@@ -1,6 +1,6 @@
 import { MaterialIcons, Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -18,6 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { getNearbyInstitutions } from "@/services/institutionService";
+import { useTheme } from "@/hooks/useTheme";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -39,6 +40,8 @@ type RouteInfo = {
 };
 
 export default function MapScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = useStyles(colors, isDark);
   const mapRef = useRef<MapView>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [institutions, setInstitutions] = useState<InstitutionWithDistance[]>([]);
@@ -222,7 +225,7 @@ export default function MapScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#E74C3C" />
+          <ActivityIndicator size="large" color={colors.primary} />
           <ThemedText style={styles.loadingText}>Finding nearby donation centers...</ThemedText>
         </View>
       </SafeAreaView>
@@ -233,7 +236,7 @@ export default function MapScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
-          <Ionicons name="location-outline" size={48} color="#BDC3C7" />
+          <Ionicons name="location-outline" size={48} color={colors.iconMuted} />
           <ThemedText style={styles.errorTitle}>Location Required</ThemedText>
           <ThemedText style={styles.errorText}>{locationError}</ThemedText>
           <TouchableOpacity style={styles.retryButton} onPress={loadData}>
@@ -252,6 +255,7 @@ export default function MapScreen() {
           <MapView
             ref={mapRef}
             style={styles.map}
+            userInterfaceStyle={isDark ? "dark" : "light"}
             initialRegion={{
               ...userLocation,
               latitudeDelta: 0.06,
@@ -267,7 +271,7 @@ export default function MapScreen() {
                 coordinate={{ latitude: inst.latitude, longitude: inst.longitude }}
                 title={inst.institution_name}
                 description={`${inst.distance} km away`}
-                pinColor={inst.institution_type === "blood_bank" ? "#2563EB" : "#DC2626"}
+                pinColor={inst.institution_type === "blood_bank" ? colors.accent : colors.primary}
                 onPress={() => focusMarker(inst)}
               />
             ))}
@@ -276,7 +280,7 @@ export default function MapScreen() {
             {routeInfo && routeInfo.coordinates.length > 0 && (
               <Polyline
                 coordinates={routeInfo.coordinates}
-                strokeColor="#2563EB"
+                strokeColor={colors.accent}
                 strokeWidth={4}
               />
             )}
@@ -286,7 +290,7 @@ export default function MapScreen() {
         {/* Floating header */}
         <View style={styles.floatingHeader}>
           <View style={styles.headerPill}>
-            <Ionicons name="heart" size={18} color="#DC2626" />
+            <Ionicons name="heart" size={18} color={colors.primary} />
             <ThemedText style={styles.headerTitle}>Donation Centers</ThemedText>
             <View style={styles.countBadge}>
               <ThemedText style={styles.countText}>{institutions.length}</ThemedText>
@@ -311,24 +315,24 @@ export default function MapScreen() {
           disabled={refreshing}
         >
           <Animated.View style={{ transform: [{ rotate: spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}>
-            <MaterialIcons name="refresh" size={22} color={refreshing ? '#93C5FD' : '#2563EB'} />
+            <MaterialIcons name="refresh" size={22} color={refreshing ? colors.accent + '80' : colors.accent} />
           </Animated.View>
         </TouchableOpacity>
 
         {/* My Location FAB */}
         <TouchableOpacity style={styles.locationFab} onPress={centerOnUser}>
-          <MaterialIcons name="my-location" size={22} color="#2563EB" />
+          <MaterialIcons name="my-location" size={22} color={colors.accent} />
         </TouchableOpacity>
 
         {/* Selected Center Card */}
         {selectedCenter && (
           <View style={styles.selectedCard}>
             <View style={styles.selectedCardHeader}>
-              <View style={[styles.typeIcon, { backgroundColor: selectedCenter.institution_type === 'blood_bank' ? '#DBEAFE' : '#FEE2E2' }]}>
+              <View style={[styles.typeIcon, { backgroundColor: selectedCenter.institution_type === 'blood_bank' ? (isDark ? '#1E3A8A' : '#DBEAFE') : (isDark ? '#7F1D1D' : '#FEE2E2') }]}>
                 <Ionicons
                   name={selectedCenter.institution_type === 'blood_bank' ? 'water' : 'medkit'}
                   size={20}
-                  color={selectedCenter.institution_type === 'blood_bank' ? '#2563EB' : '#DC2626'}
+                  color={selectedCenter.institution_type === 'blood_bank' ? (isDark ? '#60A5FA' : '#2563EB') : (isDark ? '#FCA5A5' : '#DC2626')}
                 />
               </View>
               <View style={styles.selectedCardInfo}>
@@ -347,12 +351,12 @@ export default function MapScreen() {
             {/* Route info row */}
             {routeLoading ? (
               <View style={styles.routeInfoRow}>
-                <ActivityIndicator size="small" color="#2563EB" />
+                <ActivityIndicator size="small" color={colors.accent} />
                 <ThemedText style={styles.routeInfoText}>Calculating route...</ThemedText>
               </View>
             ) : routeInfo && routeInfo.durationMin > 0 ? (
               <View style={styles.routeInfoRow}>
-                <MaterialIcons name="directions-car" size={16} color="#2563EB" />
+                <MaterialIcons name="directions-car" size={16} color={colors.accent} />
                 <ThemedText style={styles.routeInfoText}>
                   {routeInfo.distanceKm} km · {formatDuration(routeInfo.durationMin)} drive
                 </ThemedText>
@@ -364,7 +368,7 @@ export default function MapScreen() {
                 style={styles.directionsBtn}
                 onPress={() => openDirections(selectedCenter)}
               >
-                <MaterialIcons name="directions" size={18} color="#2563EB" />
+                <MaterialIcons name="directions" size={18} color={colors.accent} />
                 <ThemedText style={styles.directionsBtnText}>Directions</ThemedText>
               </TouchableOpacity>
               {selectedCenter.phone && (
@@ -372,7 +376,7 @@ export default function MapScreen() {
                   style={styles.callBtn}
                   onPress={() => callCenter(selectedCenter.phone!)}
                 >
-                  <Ionicons name="call" size={16} color="#FFF" />
+                  <Ionicons name="call" size={16} color={colors.surface} />
                   <ThemedText style={styles.callBtnText}>Call</ThemedText>
                 </TouchableOpacity>
               )}
@@ -380,7 +384,7 @@ export default function MapScreen() {
                 style={styles.closeBtn}
                 onPress={() => setSelectedCenter(null)}
               >
-                <MaterialIcons name="close" size={18} color="#64748B" />
+                <MaterialIcons name="close" size={18} color={colors.icon} />
               </TouchableOpacity>
             </View>
           </View>
@@ -397,7 +401,7 @@ export default function MapScreen() {
           >
             {institutions.length === 0 ? (
               <View style={styles.emptyState}>
-                <Ionicons name="search-outline" size={32} color="#BDC3C7" />
+                <Ionicons name="search-outline" size={32} color={colors.iconMuted} />
                 <ThemedText style={styles.emptyText}>No donation centers found nearby</ThemedText>
               </View>
             ) : (
@@ -410,11 +414,11 @@ export default function MapScreen() {
                     activeOpacity={0.7}
                     onPress={() => focusMarker(inst)}
                   >
-                    <View style={[styles.centerIcon, { backgroundColor: inst.institution_type === 'blood_bank' ? '#DBEAFE' : '#FEE2E2' }]}>
+                    <View style={[styles.centerIcon, { backgroundColor: inst.institution_type === 'blood_bank' ? (isDark ? '#1E3A8A' : '#DBEAFE') : (isDark ? '#7F1D1D' : '#FEE2E2') }]}>
                       <Ionicons
                         name={inst.institution_type === 'blood_bank' ? 'water' : 'medkit'}
                         size={18}
-                        color={inst.institution_type === 'blood_bank' ? '#2563EB' : '#DC2626'}
+                        color={inst.institution_type === 'blood_bank' ? (isDark ? '#60A5FA' : '#2563EB') : (isDark ? '#FCA5A5' : '#DC2626')}
                       />
                     </View>
                     <View style={styles.centerInfo}>
@@ -427,7 +431,7 @@ export default function MapScreen() {
                     </View>
                     <View style={styles.centerDistance}>
                       <ThemedText style={styles.centerDistanceText}>{inst.distance} km</ThemedText>
-                      <MaterialIcons name="chevron-right" size={16} color="#BDC3C7" />
+                      <MaterialIcons name="chevron-right" size={16} color={colors.iconMuted} />
                     </View>
                   </TouchableOpacity>
                 );
@@ -440,10 +444,10 @@ export default function MapScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F8F4F4",
+    backgroundColor: colors.background,
   },
   container: {
     flex: 1,
@@ -462,25 +466,25 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: "#7F8C8D",
+    color: colors.textSecondary,
     marginTop: 16,
   },
   errorTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#2C3E50",
+    color: colors.textPrimary,
     marginTop: 16,
     marginBottom: 8,
   },
   errorText: {
     fontSize: 14,
-    color: "#7F8C8D",
+    color: colors.textSecondary,
     textAlign: "center",
     lineHeight: 20,
     marginBottom: 24,
   },
   retryButton: {
-    backgroundColor: "#DC2626",
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingHorizontal: 32,
     paddingVertical: 14,
@@ -502,24 +506,24 @@ const styles = StyleSheet.create({
   headerPill: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFF",
+    backgroundColor: colors.card,
     borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 10,
     gap: 8,
-    shadowColor: "#000",
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
+    shadowOpacity: isDark ? 0.3 : 0.12,
     shadowRadius: 8,
     elevation: 5,
   },
   headerTitle: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#1E293B",
+    color: colors.textPrimary,
   },
   countBadge: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: colors.borderLight,
     borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -527,7 +531,7 @@ const styles = StyleSheet.create({
   countText: {
     fontSize: 12,
     fontWeight: "bold",
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   // FABs
@@ -538,12 +542,12 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "#FFF",
+    backgroundColor: colors.card,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOpacity: isDark ? 0.3 : 0.15,
     shadowRadius: 6,
     elevation: 5,
   },
@@ -554,12 +558,12 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "#FFF",
+    backgroundColor: colors.card,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOpacity: isDark ? 0.3 : 0.15,
     shadowRadius: 6,
     elevation: 5,
   },
@@ -570,12 +574,12 @@ const styles = StyleSheet.create({
     bottom: 260,
     left: 16,
     right: 16,
-    backgroundColor: "#FFF",
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 16,
-    shadowColor: "#000",
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: isDark ? 0.3 : 0.15,
     shadowRadius: 12,
     elevation: 8,
   },
@@ -598,15 +602,15 @@ const styles = StyleSheet.create({
   selectedCardName: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#1E293B",
+    color: colors.textPrimary,
     marginBottom: 2,
   },
   selectedCardAddress: {
     fontSize: 13,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
   distancePill: {
-    backgroundColor: "#F0FDF4",
+    backgroundColor: colors.success + '20',
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -614,7 +618,7 @@ const styles = StyleSheet.create({
   distanceText: {
     fontSize: 12,
     fontWeight: "bold",
-    color: "#16A34A",
+    color: colors.success,
   },
 
   // Route info
@@ -622,7 +626,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: colors.accent + '15',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -631,7 +635,7 @@ const styles = StyleSheet.create({
   routeInfoText: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#2563EB",
+    color: colors.accent,
   },
 
   selectedCardActions: {
@@ -645,14 +649,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: colors.accent + '15',
     borderRadius: 10,
     paddingVertical: 10,
   },
   directionsBtnText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#2563EB",
+    color: colors.accent,
   },
   callBtn: {
     flex: 1,
@@ -660,20 +664,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    backgroundColor: "#DC2626",
+    backgroundColor: colors.primary,
     borderRadius: 10,
     paddingVertical: 10,
   },
   callBtnText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#FFF",
+    color: colors.surface,
   },
   closeBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: colors.borderLight,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -685,13 +689,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 240,
-    backgroundColor: "#FFF",
+    backgroundColor: colors.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: 8,
-    shadowColor: "#000",
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.1,
+    shadowOpacity: isDark ? 0.3 : 0.1,
     shadowRadius: 10,
     elevation: 10,
   },
@@ -699,14 +703,14 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: colors.border,
     alignSelf: "center",
     marginBottom: 12,
   },
   bottomSheetTitle: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#1E293B",
+    color: colors.textPrimary,
     paddingHorizontal: 20,
     marginBottom: 8,
   },
@@ -725,12 +729,12 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     marginBottom: 6,
-    backgroundColor: "#FAFAFA",
+    backgroundColor: isDark ? colors.background : "#FAFAFA",
   },
   centerCardSelected: {
-    backgroundColor: "#EFF6FF",
+    backgroundColor: colors.accent + '15',
     borderWidth: 1,
-    borderColor: "#93C5FD",
+    borderColor: colors.accent + '50',
   },
   centerIcon: {
     width: 36,
@@ -746,12 +750,12 @@ const styles = StyleSheet.create({
   centerName: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#1E293B",
+    color: colors.textPrimary,
     marginBottom: 2,
   },
   centerAddress: {
     fontSize: 12,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
   centerDistance: {
     flexDirection: "row",
@@ -761,7 +765,7 @@ const styles = StyleSheet.create({
   centerDistanceText: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#7F8C8D",
+    color: colors.textSecondary,
   },
 
   // Empty state
@@ -771,7 +775,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    color: "#7F8C8D",
+    color: colors.textSecondary,
     marginTop: 8,
   },
-});
+}), [colors, isDark]);

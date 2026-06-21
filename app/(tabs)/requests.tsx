@@ -1,6 +1,6 @@
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -10,15 +10,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getActiveRequests } from '@/services/requestService';
 import { getDonorRequestStatuses, DonationStatus } from '@/services/donationService';
 import { getDonorProfile, getCooldownStatus } from '@/services/donorService';
+import { useTheme } from '@/hooks/useTheme';
 
 // Status config for visual indicators
-const STATUS_CONFIG: Record<DonationStatus, { label: string; icon: string; color: string; bg: string; borderColor: string; cardBg: string }> = {
-  scheduled: { label: 'Scheduled', icon: 'time-outline', color: '#2563EB', bg: '#DBEAFE', borderColor: '#93C5FD', cardBg: '#EFF6FF' },
-  confirmed: { label: 'Confirmed', icon: 'checkmark-done-outline', color: '#D97706', bg: '#FEF3C7', borderColor: '#FDE68A', cardBg: '#FFFBEB' },
-  completed: { label: 'Donated', icon: 'ribbon-outline', color: '#16A34A', bg: '#DCFCE7', borderColor: '#BBF7D0', cardBg: '#F0FDF4' },
-  cancelled: { label: 'Cancelled', icon: 'close-circle-outline', color: '#64748B', bg: '#F1F5F9', borderColor: '#E2E8F0', cardBg: '#F8FAFC' },
-  no_show: { label: 'No Show', icon: 'help-circle-outline', color: '#64748B', bg: '#F1F5F9', borderColor: '#E2E8F0', cardBg: '#F8FAFC' },
-};
+const getStatusConfig = (colors: any, isDark: boolean): Record<DonationStatus, { label: string; icon: string; color: string; bg: string; borderColor: string; cardBg: string }> => ({
+  scheduled: { label: 'Scheduled', icon: 'time-outline', color: isDark ? '#60A5FA' : '#2563EB', bg: isDark ? '#1E3A8A' : '#DBEAFE', borderColor: isDark ? '#1E40AF' : '#93C5FD', cardBg: isDark ? '#172554' : '#EFF6FF' },
+  confirmed: { label: 'Confirmed', icon: 'checkmark-done-outline', color: isDark ? '#FBBF24' : '#D97706', bg: isDark ? '#78350F' : '#FEF3C7', borderColor: isDark ? '#92400E' : '#FDE68A', cardBg: isDark ? '#451A03' : '#FFFBEB' },
+  completed: { label: 'Donated', icon: 'ribbon-outline', color: isDark ? '#4ADE80' : '#16A34A', bg: isDark ? '#14532D' : '#DCFCE7', borderColor: isDark ? '#166534' : '#BBF7D0', cardBg: isDark ? '#052E16' : '#F0FDF4' },
+  cancelled: { label: 'Cancelled', icon: 'close-circle-outline', color: colors.textSecondary, bg: colors.borderLight, borderColor: colors.border, cardBg: colors.background },
+  no_show: { label: 'No Show', icon: 'help-circle-outline', color: colors.textSecondary, bg: colors.borderLight, borderColor: colors.border, cardBg: colors.background },
+});
 
 function getTimeAgo(dateStr: string): string {
   const now = Date.now();
@@ -35,12 +36,15 @@ function getTimeAgo(dateStr: string): string {
 
 export default function RequestsScreen() {
   const { user } = useAuth();
+  const { colors, isDark } = useTheme();
+  const styles = useStyles(colors, isDark);
   const [selectedFilter, setSelectedFilter] = useState<string>('All');
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [requestStatuses, setRequestStatuses] = useState<Map<string, DonationStatus>>(new Map());
   const [cooldownStatus, setCooldownStatus] = useState<{ isEligible: boolean; nextEligibleDate: Date | null; daysRemaining: number }>({ isEligible: true, nextEligibleDate: null, daysRemaining: 0 });
+  const STATUS_CONFIG = getStatusConfig(colors, isDark);
 
   const filters = ['All', 'Critical', 'High', 'Moderate', 'Low'];
 
@@ -93,24 +97,24 @@ export default function RequestsScreen() {
 
   const getUrgencyColor = (urgency: string) => {
     switch (urgency) {
-      case 'critical': return '#E74C3C';
-      case 'high': return '#E67E22';
+      case 'critical': return colors.error;
+      case 'high': return colors.warning;
       case 'moderate': return '#F1C40F';
-      case 'low': return '#27AE60';
-      default: return '#7F8C8D';
+      case 'low': return colors.success;
+      default: return colors.iconMuted;
     }
   };
 
   const criticalCount = visibleRequests.filter(r => r.urgency_level === 'critical' || r.urgency_level === 'high').length;
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#F8F4F4' }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView
           style={styles.container}
           contentContainerStyle={styles.contentContainer}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#E74C3C']} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} tintColor={colors.primary} />
           }
         >
         {/* Header */}
@@ -124,7 +128,7 @@ export default function RequestsScreen() {
         {/* Cooldown Banner */}
         {!cooldownStatus.isEligible && (
           <View style={styles.cooldownBanner}>
-            <Ionicons name="hourglass-outline" size={18} color="#D97706" />
+            <Ionicons name="hourglass-outline" size={18} color={colors.warning} />
             <ThemedText style={styles.cooldownBannerText}>
               Cooldown active — eligible again on {cooldownStatus.nextEligibleDate?.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} ({cooldownStatus.daysRemaining}d)
             </ThemedText>
@@ -165,7 +169,7 @@ export default function RequestsScreen() {
             <ThemedText style={styles.statLabel}>Active</ThemedText>
           </View>
           <View style={styles.statCard}>
-            <ThemedText style={[styles.statNumber, { color: '#E74C3C' }]}>{criticalCount}</ThemedText>
+            <ThemedText style={[styles.statNumber, { color: colors.primary }]}>{criticalCount}</ThemedText>
             <ThemedText style={styles.statLabel}>Urgent</ThemedText>
           </View>
           <View style={styles.statCard}>
@@ -177,10 +181,10 @@ export default function RequestsScreen() {
         {/* Requests List */}
         <View style={styles.requestsSection}>
           {loading ? (
-            <ActivityIndicator size="large" color="#E74C3C" style={{ marginTop: 40 }} />
+            <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
           ) : filteredRequests.length === 0 ? (
             <View style={styles.emptyState}>
-              <MaterialIcons name="assignment" size={48} color="#BDC3C7" />
+              <MaterialIcons name="assignment" size={48} color={colors.iconMuted} />
               <ThemedText style={styles.emptyTitle}>No requests found</ThemedText>
               <ThemedText style={styles.emptyDescription}>
                 {selectedFilter === 'All'
@@ -251,7 +255,7 @@ export default function RequestsScreen() {
                   <View style={styles.requestDetails}>
                     {req.date_needed && (
                       <View style={styles.detailRow}>
-                        <MaterialIcons name="event" size={14} color="#7F8C8D" style={styles.detailIcon} />
+                        <MaterialIcons name="event" size={14} color={colors.icon} style={styles.detailIcon} />
                         <ThemedText style={styles.detailText}>
                           Needed by {new Date(req.date_needed).toLocaleDateString()}
                           {req.time_needed ? ` at ${req.time_needed}` : ''}
@@ -259,7 +263,7 @@ export default function RequestsScreen() {
                       </View>
                     )}
                     <View style={styles.detailRow}>
-                      <MaterialIcons name="access-time" size={14} color="#7F8C8D" style={styles.detailIcon} />
+                      <MaterialIcons name="access-time" size={14} color={colors.icon} style={styles.detailIcon} />
                       <ThemedText style={styles.detailText}>Posted {timeAgo}</ThemedText>
                     </View>
                   </View>
@@ -309,14 +313,14 @@ export default function RequestsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F8F4F4',
+    backgroundColor: colors.background,
   },
   container: {
     flex: 1,
-    backgroundColor: '#F8F4F4',
+    backgroundColor: colors.background,
   },
   contentContainer: {
     padding: 16,
@@ -338,12 +342,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#2C3E50',
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 16,
-    color: '#7F8C8D',
+    color: colors.textSecondary,
   },
 
   // Filters Section
@@ -354,24 +358,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   filterButton: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     borderRadius: 20,
     paddingHorizontal: 18,
     paddingVertical: 9,
     marginRight: 10,
-    shadowColor: '#000',
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: isDark ? 0.2 : 0.05,
     shadowRadius: 4,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   selectedFilterButton: {
-    backgroundColor: '#E74C3C',
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   filterText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#7F8C8D',
+    color: colors.textSecondary,
   },
   selectedFilterText: {
     color: '#FFFFFF',
@@ -385,25 +392,27 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: 14,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: isDark ? 0.2 : 0.05,
     shadowRadius: 4,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   statNumber: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#2C3E50',
+    color: colors.textPrimary,
     marginBottom: 2,
   },
   statLabel: {
     fontSize: 12,
-    color: '#7F8C8D',
+    color: colors.textSecondary,
     textAlign: 'center',
   },
 
@@ -412,15 +421,17 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   requestCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     borderRadius: 14,
     padding: 16,
     marginBottom: 14,
-    shadowColor: '#000',
+    shadowColor: colors.shadowColor,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: isDark ? 0.2 : 0.08,
     shadowRadius: 8,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   requestHeader: {
     flexDirection: 'row',
@@ -435,20 +446,20 @@ const styles = StyleSheet.create({
   patientName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#2C3E50',
+    color: colors.textPrimary,
   },
   ownRequestBadge: {
-    backgroundColor: '#EBF5FF',
+    backgroundColor: colors.primaryLight,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#93C5FD',
+    borderColor: colors.primary + '50',
   },
   ownRequestBadgeText: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#2563EB',
+    color: colors.primary,
     textTransform: 'uppercase',
   },
   requestMeta: {
@@ -459,16 +470,16 @@ const styles = StyleSheet.create({
   bloodType: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#E74C3C',
+    color: colors.primary,
   },
   separator: {
     fontSize: 14,
-    color: '#BDC3C7',
+    color: colors.textMuted,
     marginHorizontal: 6,
   },
   units: {
     fontSize: 14,
-    color: '#7F8C8D',
+    color: colors.textSecondary,
   },
   statusBadge: {
     borderRadius: 12,
@@ -485,7 +496,7 @@ const styles = StyleSheet.create({
   // Description
   descriptionText: {
     fontSize: 13,
-    color: '#7F8C8D',
+    color: colors.textSecondary,
     lineHeight: 18,
     marginBottom: 10,
     fontStyle: 'italic',
@@ -507,7 +518,7 @@ const styles = StyleSheet.create({
   },
   detailText: {
     fontSize: 13,
-    color: '#95A5A6',
+    color: colors.textSecondary,
   },
 
   // Footer
@@ -516,7 +527,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: colors.borderLight,
     paddingTop: 12,
   },
   footerLeft: {
@@ -538,7 +549,7 @@ const styles = StyleSheet.create({
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4A90E2',
+    backgroundColor: colors.accent,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -584,13 +595,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#2C3E50',
+    color: colors.textPrimary,
     marginTop: 12,
     marginBottom: 8,
   },
   emptyDescription: {
     fontSize: 14,
-    color: '#7F8C8D',
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
     paddingHorizontal: 32,
@@ -607,11 +618,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#E74C3C',
+    backgroundColor: colors.primary,
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderRadius: 28,
-    shadowColor: '#E74C3C',
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -628,18 +639,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: isDark ? '#451A03' : '#FEF3C7',
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: isDark ? '#78350F' : '#FDE68A',
   },
   cooldownBannerText: {
     flex: 1,
     fontSize: 13,
-    color: '#92400E',
+    color: isDark ? '#FDE68A' : '#92400E',
     fontWeight: '600',
   },
-});
+}), [colors, isDark]);
