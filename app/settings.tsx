@@ -8,6 +8,14 @@ import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { updateProfile } from '@/services/donorService';
+import {
+  getReminderSettings,
+  saveReminderSettings,
+  scheduleDonationReminders,
+  cancelAllDonationReminders,
+  ReminderSettings,
+} from '@/services/notificationService';
+import { getCooldownStatus } from '@/services/donorService';
 
 export default function SettingsScreen() {
   const { colors, isDark, themeMode, setThemeMode } = useTheme();
@@ -16,14 +24,23 @@ export default function SettingsScreen() {
   const [anonymousDonations, setAnonymousDonations] = useState<boolean>(false);
   const [urgentRequests, setUrgentRequests] = useState<boolean>(false);
   const [messages, setMessages] = useState<boolean>(false);
-  const [donationReminders, setDonationReminders] = useState<boolean>(false);
+  const [reminderSettings, setReminderSettings] = useState<ReminderSettings>({
+    enabled: true,
+    reminderDays: [30, 7, 1],
+    timeOfDay: '09:00',
+  });
   const [biometricLogin, setBiometricLogin] = useState<boolean>(false);
 
-  // Load anonymous preference from profile
+  // Load anonymous preference from profile and reminder settings
   useEffect(() => {
     if (profile?.default_anonymous !== undefined) {
       setAnonymousDonations(profile.default_anonymous);
     }
+    const loadReminders = async () => {
+      const settings = await getReminderSettings();
+      setReminderSettings(settings);
+    };
+    loadReminders();
   }, [profile]);
 
   const handleAnonymousChange = async (value: boolean) => {
@@ -31,6 +48,20 @@ export default function SettingsScreen() {
     if (user?.id) {
       await updateProfile(user.id, { default_anonymous: value });
       await refreshProfile();
+    }
+  };
+
+  const handleReminderToggle = async (value: boolean) => {
+    const newSettings = { ...reminderSettings, enabled: value };
+    setReminderSettings(newSettings);
+    await saveReminderSettings(newSettings);
+    // Reschedule reminders
+    if (profile?.donors?.next_eligible_date) {
+      if (value) {
+        await scheduleDonationReminders(new Date(profile.donors.next_eligible_date));
+      } else {
+        await cancelAllDonationReminders();
+      }
     }
   };
 
@@ -215,16 +246,86 @@ export default function SettingsScreen() {
           <SettingItem
             icon="event"
             title="Donation reminders"
-            description="Scheduling and eligibility"
+            description="Eligibility and scheduling alerts"
             rightElement={
               <Switch
-                value={donationReminders}
-                onValueChange={setDonationReminders}
+                value={reminderSettings.enabled}
+                onValueChange={handleReminderToggle}
                 trackColor={{ false: colors.borderLight, true: colors.accent }}
-                thumbColor={donationReminders ? '#FFFFFF' : '#FFFFFF'}
+                thumbColor={reminderSettings.enabled ? '#FFFFFF' : '#FFFFFF'}
               />
             }
           />
+          {reminderSettings.enabled && (
+            <View style={styles.reminderSettings}>
+              <ThemedText style={styles.reminderSettingsTitle}>Reminder Schedule</ThemedText>
+              <View style={styles.reminderDaysContainer}>
+                {[30, 14, 7, 3, 1, 0].map(days => (
+                  <TouchableOpacity
+                    key={days}
+                    style={[
+                      styles.reminderDayButton,
+                      reminderSettings.reminderDays.includes(days) && styles.reminderDayButtonActive,
+                    ]}
+                    onPress={async () => {
+                      let newDays: number[];
+                      if (reminderSettings.reminderDays.includes(days)) {
+                        newDays = reminderSettings.reminderDays.filter(d => d !== days);
+                      } else {
+                        newDays = [...reminderSettings.reminderDays, days].sort((a, b) => b - a);
+                      }
+                      const newSettings = { ...reminderSettings, reminderDays: newDays };
+                      setReminderSettings(newSettings);
+                      await saveReminderSettings(newSettings);
+                      if (profile?.donors?.next_eligible_date) {
+                        await scheduleDonationReminders(new Date(profile.donors.next_eligible_date));
+                      }
+                    }}
+                  >
+                    <ThemedText
+                      style={[
+                        styles.reminderDayText,
+                        reminderSettings.reminderDays.includes(days) && styles.reminderDayTextActive,
+                      ]}
+                    >
+                      {days === 0 ? 'Today' : `${days}d`}
+                    </ThemedText>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <View style={styles.timeSetting}>
+                <ThemedText style={styles.timeLabel}>Time of Day</ThemedText>
+                <View style={styles.timeButtons}>
+                  {['08:00', '09:00', '10:00', '12:00', '18:00'].map(time => (
+                    <TouchableOpacity
+                      key={time}
+                      style={[
+                        styles.timeButton,
+                        reminderSettings.timeOfDay === time && styles.timeButtonActive,
+                      ]}
+                      onPress={async () => {
+                        const newSettings = { ...reminderSettings, timeOfDay: time };
+                        setReminderSettings(newSettings);
+                        await saveReminderSettings(newSettings);
+                        if (profile?.donors?.next_eligible_date) {
+                          await scheduleDonationReminders(new Date(profile.donors.next_eligible_date));
+                        }
+                      }}
+                    >
+                      <ThemedText
+                        style={[
+                          styles.timeButtonText,
+                          reminderSettings.timeOfDay === time && styles.timeButtonTextActive,
+                        ]}
+                      >
+                        {time}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
+          )}
         </Section>
 
         {/* Privacy & Security Section */}
@@ -441,5 +542,78 @@ const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.cre
   // Bottom spacer
   bottomSpacer: {
     height: 20,
+  },
+
+  // Reminder Settings
+  reminderSettings: {
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
+  },
+  reminderSettingsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: 12,
+  },
+  reminderDaysContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  reminderDayButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    backgroundColor: colors.card,
+  },
+  reminderDayButtonActive: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accent + '20',
+  },
+  reminderDayText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.textSecondary,
+  },
+  reminderDayTextActive: {
+    color: colors.accent,
+  },
+  timeSetting: {
+    marginTop: 4,
+  },
+  timeLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: 8,
+  },
+  timeButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  timeButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    backgroundColor: colors.card,
+  },
+  timeButtonActive: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accent + '20',
+  },
+  timeButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.textSecondary,
+  },
+  timeButtonTextActive: {
+    color: colors.accent,
   },
 }), [colors, isDark]);

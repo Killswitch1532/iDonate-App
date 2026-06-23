@@ -25,6 +25,7 @@ import { getNearbyInstitutionCount, getNearbyInstitutions } from "@/services/ins
 import { getActiveRequests } from "@/services/requestService";
 import { getDonorRequestStatuses, DonationStatus } from "@/services/donationService";
 import { getCache, setCache } from "@/services/offlineCache";
+import { scheduleDonationReminders } from "@/services/notificationService";
 
 const getStatusConfig = (colors: any, isDark: boolean): Record<DonationStatus, { label: string; color: string; bg: string; borderColor: string; cardBg: string }> => ({
   scheduled: { label: 'Scheduled', color: isDark ? '#60A5FA' : '#2563EB', bg: isDark ? '#1E3A8A' : '#DBEAFE', borderColor: isDark ? '#1E40AF' : '#93C5FD', cardBg: isDark ? '#172554' : '#EFF6FF' },
@@ -83,7 +84,12 @@ export default function HomeScreen() {
         getCache(`donor_profile:${user.id}`).then(cached => {
           if (cached && !cancelled) {
             if (cached.blood_type) setBloodType(cached.blood_type);
-            setCooldownInfo(getCooldownStatus(cached));
+            const cooldown = getCooldownStatus(cached);
+            setCooldownInfo(cooldown);
+            // Schedule reminders from cached data too
+            if (cooldown.nextEligibleDate) {
+              scheduleDonationReminders(cooldown.nextEligibleDate);
+            }
           }
         });
         getCache(`request_statuses:${user.id}`).then(cachedStatuses => {
@@ -106,8 +112,13 @@ export default function HomeScreen() {
           const { data } = await getDonorProfile(user.id);
           if (!cancelled && data) {
             if (data.blood_type) setBloodType(data.blood_type);
-            setCooldownInfo(getCooldownStatus(data));
+            const cooldown = getCooldownStatus(data);
+            setCooldownInfo(cooldown);
             setCache(`donor_profile:${user.id}`, data);
+            // Schedule donation reminders if in cooldown
+            if (cooldown.nextEligibleDate) {
+              await scheduleDonationReminders(cooldown.nextEligibleDate);
+            }
           }
         })();
         const requestsPromise = (async () => {

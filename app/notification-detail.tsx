@@ -53,6 +53,8 @@ export default function NotificationDetailScreen() {
         return { name: 'warning', color: colors.primary };
       case 'appointment_confirmed':
         return { name: 'check-circle', color: colors.success };
+      case 'reminder':
+        return { name: 'event', color: colors.accent };
       case 'system_broadcast':
       default:
         return { name: 'notifications', color: colors.accent };

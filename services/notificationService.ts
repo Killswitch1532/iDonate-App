@@ -3,6 +3,7 @@ import * as Notifications from 'expo-notifications';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform, Alert } from 'react-native';
 import { supabase } from '@/lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
  * Check if we're running in Expo Go (push notifications are not supported)
@@ -202,3 +203,111 @@ export const clearAllNotifications = async (userId: string) => {
     .delete()
     .eq('user_id', userId);
 };
+
+/**
+ * REMINDER SETTINGS & SCHEDULING
+ */
+
+const REMINDER_SETTINGS_KEY = 'reminder_settings';
+const REMINDER_ID_PREFIX = 'idonate_reminder_';
+
+export interface ReminderSettings {
+  enabled: boolean;
+  reminderDays: number[]; // e.g., [30, 7, 1] - days before eligibility to remind
+  timeOfDay: string; // e.g., '09:00'
+}
+
+const DEFAULT_REMINDER_SETTINGS: ReminderSettings = {
+  enabled: true,
+  reminderDays: [30, 7, 1],
+  timeOfDay: '09:00',
+};
+
+export async function getReminderSettings(): Promise<ReminderSettings> {
+  try {
+    const stored = await AsyncStorage.getItem(REMINDER_SETTINGS_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+    return DEFAULT_REMINDER_SETTINGS;
+  } catch {
+    return DEFAULT_REMINDER_SETTINGS;
+  }
+}
+
+export async function saveReminderSettings(settings: ReminderSettings): Promise<void> {
+  await AsyncStorage.setItem(REMINDER_SETTINGS_KEY, JSON.stringify(settings));
+}
+
+export async function scheduleDonationReminders(nextEligibleDate: Date): Promise<void> {
+  if (isExpoGo()) return;
+  
+  // Cancel existing reminders first
+  await cancelAllDonationReminders();
+
+  const settings = await getReminderSettings();
+  if (!settings.enabled) return;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const eligibilityDate = new Date(nextEligibleDate);
+  eligibilityDate.setHours(0, 0, 0, 0);
+
+  // Parse time of day
+  const [hours, minutes] = settings.timeOfDay.split(':').map(Number);
+
+  for (const daysBefore of settings.reminderDays) {
+    const reminderDate = new Date(eligibilityDate);
+    reminderDate.setDate(reminderDate.getDate() - daysBefore);
+    reminderDate.setHours(hours, minutes, 0, 0);
+
+    // Only schedule if reminder date is in the future
+    if (reminderDate > today) {
+      const reminderId = `${REMINDER_ID_PREFIX}${daysBefore}`;
+      let message = '';
+      
+      if (daysBefore === 0) {
+        message = 'You are eligible to donate today!';
+      } else if (daysBefore === 1) {
+        message = 'You will be eligible to donate tomorrow!';
+      } else {
+        message = `You will be eligible to donate in ${daysBefore} days!`;
+      }
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'iDonate',
+          body: message,
+          sound: true,
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+        },
+        trigger: {
+          date: reminderDate,
+        },
+        identifier: reminderId,
+      });
+      console.log(`[iDonate:Reminders] Scheduled reminder for ${reminderDate.toISOString()} (${daysBefore} days before)`);
+    }
+  }
+}
+
+export async function cancelAllDonationReminders(): Promise<void> {
+  if (isExpoGo()) return;
+  
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  const donationReminders = scheduled.filter(n => 
+    n.identifier.startsWith(REMINDER_ID_PREFIX)
+  );
+  
+  for (const reminder of donationReminders) {
+    await Notifications.cancelScheduledNotificationAsync(reminder.identifier);
+  }
+  console.log(`[iDonate:Reminders] Cancelled ${donationReminders.length} donation reminders`);
+}
+
+export async function getScheduledReminders(): Promise<Notifications.NotificationRequest[]> {
+  if (isExpoGo()) return [];
+  
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  return scheduled.filter(n => n.identifier.startsWith(REMINDER_ID_PREFIX));
+}

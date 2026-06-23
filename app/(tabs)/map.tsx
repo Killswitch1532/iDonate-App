@@ -1,4 +1,5 @@
 import { MaterialIcons, Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import * as Location from "expo-location";
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
@@ -365,6 +366,13 @@ export default function MapScreen() {
 
             <View style={styles.selectedCardActions}>
               <TouchableOpacity
+                style={styles.bookBtn}
+                onPress={() => router.push({ pathname: '/donate-blood', params: { centerId: selectedCenter.id } })}
+              >
+                <MaterialIcons name="event-available" size={18} color={colors.surface} />
+                <ThemedText style={styles.bookBtnText}>Book Appointment</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={styles.directionsBtn}
                 onPress={() => openDirections(selectedCenter)}
               >
@@ -639,15 +647,30 @@ const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.cre
   },
 
   selectedCardActions: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 10,
-    alignItems: "center",
+    alignItems: 'center',
+  },
+  bookBtn: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    paddingVertical: 10,
+  },
+  bookBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.surface,
   },
   directionsBtn: {
     flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     backgroundColor: colors.accent + '15',
     borderRadius: 10,
@@ -655,14 +678,14 @@ const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.cre
   },
   directionsBtnText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
     color: colors.accent,
   },
   callBtn: {
     flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     backgroundColor: colors.primary,
     borderRadius: 10,
@@ -670,7 +693,7 @@ const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.cre
   },
   callBtnText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
     color: colors.surface,
   },
   closeBtn: {
@@ -678,8 +701,8 @@ const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.cre
     height: 36,
     borderRadius: 18,
     backgroundColor: colors.borderLight,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   // Bottom sheet

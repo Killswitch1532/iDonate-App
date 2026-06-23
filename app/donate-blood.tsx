@@ -1,5 +1,5 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View, ActivityIndicator, Linking, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -36,6 +36,9 @@ export default function DonateBloodScreen() {
   const { colors, isDark } = useTheme();
   const styles = useStyles(colors, isDark);
   const { user } = useAuth();
+  const params = useLocalSearchParams();
+  const initialCenterId = params.centerId as string;
+  
   const [selectedBloodType, setSelectedBloodType] = useState<string>('');
   const [selectedRadius, setSelectedRadius] = useState<string>('10 km');
   const [loading, setLoading] = useState<boolean>(true);
@@ -204,6 +207,16 @@ export default function DonateBloodScreen() {
 
     loadData();
   }, [user, locationCoords, selectedRadius]);
+
+  // Set initial selected center from params if available
+  useEffect(() => {
+    if (initialCenterId && realCenters.length > 0) {
+      const center = realCenters.find(c => c.id === initialCenterId);
+      if (center) {
+        setSelectedCenter(initialCenterId);
+      }
+    }
+  }, [initialCenterId, realCenters]);
 
   // Fit map to show all centers when they load
   useEffect(() => {
