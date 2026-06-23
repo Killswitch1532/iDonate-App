@@ -8,6 +8,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   TextInput,
   TouchableOpacity,
   View,
@@ -34,6 +35,7 @@ export default function EditProfileScreen() {
   // Form state
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [defaultAnonymous, setDefaultAnonymous] = useState(false);
   const [bloodType, setBloodType] = useState<string | null>(null);
   const [genotype, setGenotype] = useState<string | null>(null);
   const [address, setAddress] = useState('');
@@ -52,6 +54,7 @@ export default function EditProfileScreen() {
       if (profile) {
         setFullName(profile.full_name || '');
         setPhone(profile.phone_number || '');
+        setDefaultAnonymous(profile.default_anonymous || false);
       }
 
       // Donor data
@@ -80,6 +83,7 @@ export default function EditProfileScreen() {
       const profileUpdates: any = {};
       if (fullName.trim()) profileUpdates.full_name = fullName.trim();
       if (phone.trim()) profileUpdates.phone_number = phone.trim();
+      profileUpdates.default_anonymous = defaultAnonymous;
 
       if (Object.keys(profileUpdates).length > 0) {
         const { error } = await updateProfile(user.id, profileUpdates);
@@ -202,6 +206,23 @@ export default function EditProfileScreen() {
               <ThemedText style={styles.helperText}>
                 Email cannot be changed here
               </ThemedText>
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <View style={styles.toggleRow}>
+                <View style={styles.toggleTextContainer}>
+                  <ThemedText style={styles.toggleLabel}>Anonymous Donations</ThemedText>
+                  <ThemedText style={styles.toggleDescription}>
+                    Hide your identity from receivers by default
+                  </ThemedText>
+                </View>
+                <Switch
+                  value={defaultAnonymous}
+                  onValueChange={setDefaultAnonymous}
+                  trackColor={{ false: colors.borderLight, true: colors.accent }}
+                  thumbColor={defaultAnonymous ? '#FFFFFF' : '#FFFFFF'}
+                />
+              </View>
             </View>
           </View>
 
@@ -452,6 +473,27 @@ const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.cre
     fontSize: 12,
     color: colors.textSecondary,
     marginTop: 6,
+  },
+
+  // Toggle Row
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  toggleTextContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  toggleLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: 4,
+  },
+  toggleDescription: {
+    fontSize: 13,
+    color: colors.textSecondary,
   },
 
   // Blood Type Grid

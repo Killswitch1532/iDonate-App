@@ -184,6 +184,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     user_type: 'donor',
                     phone_number: phoneNumber,
                     avatar_url: meta?.avatar_url || meta?.picture || null,
+                    default_anonymous: false,
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'id' });
         }

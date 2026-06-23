@@ -1,13 +1,13 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useState, useMemo } from "react";
-import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 
 import { ThemedText } from "@/components/themed-text";
 import { useAuth } from "@/contexts/AuthContext";
-import { getDonorProfile, DonorProfile, getCooldownStatus } from "@/services/donorService";
+import { getDonorProfile, DonorProfile, getCooldownStatus, updateProfile } from "@/services/donorService";
 import { getDonorDonations, Donation } from "@/services/donationService";
 import { getCache, setCache } from "@/services/offlineCache";
 import { useTheme } from "@/hooks/useTheme";
@@ -15,22 +15,26 @@ import { useTheme } from "@/hooks/useTheme";
 export default function ProfileScreen() {
   const { colors, isDark } = useTheme();
   const styles = useStyles(colors, isDark);
-  const { signOut, profile, user } = useAuth();
+  const { signOut, profile, user, refreshProfile } = useAuth();
+
+  const handleAnonymousChange = async (value: boolean) => {
+    if (user?.id) {
+      await updateProfile(user.id, { default_anonymous: value });
+      await refreshProfile();
+    }
+  };
   const [donorData, setDonorData] = useState<DonorProfile | null>(null);
-  const [donorLoading, setDonorLoading] = useState(true);
   const [donations, setDonations] = useState<Donation[]>([]);
   const [donationsLoading, setDonationsLoading] = useState(true);
 
   useEffect(() => {
     if (user?.id) {
-      setDonorLoading(true);
       setDonationsLoading(true);
 
       // Load cached profile details first
       getCache(`donor_profile:${user.id}`).then(cachedProfile => {
         if (cachedProfile) {
           setDonorData(cachedProfile);
-          setDonorLoading(false);
         }
       });
 
@@ -48,8 +52,7 @@ export default function ProfileScreen() {
             setDonorData(data);
             setCache(`donor_profile:${user.id}`, data);
           }
-        })
-        .finally(() => setDonorLoading(false));
+        });
 
       getDonorDonations(user.id)
         .then(({ data }) => {
@@ -60,7 +63,6 @@ export default function ProfileScreen() {
         })
         .finally(() => setDonationsLoading(false));
     } else {
-      setDonorLoading(false);
       setDonationsLoading(false);
     }
   }, [user?.id]);
@@ -424,12 +426,14 @@ export default function ProfileScreen() {
                   color={colors.accent}
                   style={styles.shieldIcon}
                 />
-                <MaterialIcons
-                  name="check"
-                  size={16}
-                  color="#FFFFFF"
-                  style={styles.checkIcon}
-                />
+                {profile?.default_anonymous && (
+                  <MaterialIcons
+                    name="check"
+                    size={16}
+                    color="#FFFFFF"
+                    style={styles.checkIcon}
+                  />
+                )}
               </View>
               <View style={styles.anonymousText}>
                 <ThemedText style={styles.anonymousTitle}>
@@ -439,6 +443,12 @@ export default function ProfileScreen() {
                   Hide your identity from receivers
                 </ThemedText>
               </View>
+              <Switch
+                value={profile?.default_anonymous || false}
+                onValueChange={handleAnonymousChange}
+                trackColor={{ false: colors.borderLight, true: colors.accent }}
+                thumbColor={profile?.default_anonymous ? '#FFFFFF' : '#FFFFFF'}
+              />
             </View>
           </View>
         </View>

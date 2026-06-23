@@ -1,20 +1,52 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/useTheme';
+import { useAuth } from '@/contexts/AuthContext';
+import { updateProfile } from '@/services/donorService';
 
 export default function SettingsScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, themeMode, setThemeMode } = useTheme();
   const styles = useStyles(colors, isDark);
+  const { profile, user, refreshProfile } = useAuth();
   const [anonymousDonations, setAnonymousDonations] = useState<boolean>(false);
   const [urgentRequests, setUrgentRequests] = useState<boolean>(false);
   const [messages, setMessages] = useState<boolean>(false);
   const [donationReminders, setDonationReminders] = useState<boolean>(false);
   const [biometricLogin, setBiometricLogin] = useState<boolean>(false);
+
+  // Load anonymous preference from profile
+  useEffect(() => {
+    if (profile?.default_anonymous !== undefined) {
+      setAnonymousDonations(profile.default_anonymous);
+    }
+  }, [profile]);
+
+  const handleAnonymousChange = async (value: boolean) => {
+    setAnonymousDonations(value);
+    if (user?.id) {
+      await updateProfile(user.id, { default_anonymous: value });
+      await refreshProfile();
+    }
+  };
+
+  const ThemeOption = ({ mode, label }: { mode: 'light' | 'dark' | 'system', label: string }) => {
+    const isSelected = themeMode === mode;
+    return (
+      <TouchableOpacity
+        style={[styles.themeOption, isSelected && styles.themeOptionSelected]}
+        onPress={() => setThemeMode(mode)}
+      >
+        <ThemedText style={[styles.themeOptionText, isSelected && styles.themeOptionTextSelected]}>
+          {label}
+        </ThemedText>
+      </TouchableOpacity>
+    );
+  };
 
   const SettingItem = ({ 
     icon, 
@@ -89,6 +121,15 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* Appearance Section */}
+        <Section title="Appearance" icon="palette">
+          <View style={styles.themeOptions}>
+            <ThemeOption mode="light" label="Light" />
+            <ThemeOption mode="dark" label="Dark" />
+            <ThemeOption mode="system" label="System" />
+          </View>
+        </Section>
+
         {/* Account Section */}
         <Section title="Account" icon="settings">
           <SettingItem
@@ -117,11 +158,29 @@ export default function SettingsScreen() {
             rightElement={
               <Switch
                 value={anonymousDonations}
-                onValueChange={setAnonymousDonations}
+                onValueChange={handleAnonymousChange}
                 trackColor={{ false: colors.borderLight, true: colors.accent }}
                 thumbColor={anonymousDonations ? '#FFFFFF' : '#FFFFFF'}
               />
             }
+          />
+        </Section>
+
+        {/* Legal Section */}
+        <Section title="Legal" icon="gavel">
+          <SettingItem
+            icon="description"
+            title="Privacy Policy"
+            description="Read how we handle your data"
+            showChevron={true}
+            onPress={() => router.push('/privacy-policy')}
+          />
+          <SettingItem
+            icon="article"
+            title="Terms of Service"
+            description="Read the platform rules"
+            showChevron={true}
+            onPress={() => router.push('/terms-of-service')}
           />
         </Section>
 
@@ -350,6 +409,33 @@ const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.cre
     fontSize: 12,
     color: colors.textSecondary,
     fontWeight: '600',
+  },
+
+  // Theme Options
+  themeOptions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  themeOption: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    alignItems: 'center',
+  },
+  themeOptionSelected: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accent + '20',
+  },
+  themeOptionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  themeOptionTextSelected: {
+    color: colors.accent,
   },
 
   // Bottom spacer

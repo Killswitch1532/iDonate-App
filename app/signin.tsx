@@ -1,6 +1,6 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useRef, useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -37,6 +37,8 @@ export default function SignInScreen() {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [acceptTerms, setAcceptTerms] = useState(false);
+  const [acceptPrivacy, setAcceptPrivacy] = useState(false);
 
   const bloodTypes = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
@@ -71,6 +73,13 @@ export default function SignInScreen() {
         newErrors.confirmPassword = "Please confirm your password";
       } else if (password !== confirmPassword) {
         newErrors.confirmPassword = "Passwords do not match";
+      }
+
+      if (!acceptTerms) {
+        newErrors.acceptTerms = "You must accept the Terms of Service";
+      }
+      if (!acceptPrivacy) {
+        newErrors.acceptPrivacy = "You must accept the Privacy Policy";
       }
     }
 
@@ -136,6 +145,21 @@ export default function SignInScreen() {
               details: profileUpdateError.details,
               hint: profileUpdateError.hint,
             });
+          }
+
+          // Record user consent
+          console.log('[iDonate:SignIn] Recording user consent', { userId: user.id });
+          const { error: consentError } = await supabase
+            .from('user_consents')
+            .upsert({
+              user_id: user.id,
+              accepted_privacy_policy: acceptPrivacy,
+              accepted_terms: acceptTerms,
+              accepted_at: new Date().toISOString(),
+            });
+
+          if (consentError) {
+            console.error('[iDonate:SignIn] Failed to record consent', consentError);
           }
 
           // Create donor row
@@ -340,7 +364,7 @@ export default function SignInScreen() {
               <ThemedText style={styles.label}>
                 Blood Group <ThemedText style={{ color: colors.textSecondary, fontSize: 13, fontWeight: 'normal' }}>(Optional)</ThemedText>
               </ThemedText>
-              <ThemedText style={{ color: colors.textSecondary, fontSize: 13, fontWeight: 'normal' }}>(You can skip if you don't know your blood group)</ThemedText>
+              <ThemedText style={{ color: colors.textSecondary, fontSize: 13, fontWeight: 'normal' }}>(You can skip if you don&apos;t know your blood group)</ThemedText>
               <View style={[styles.bloodTypeGrid, { marginTop: 4 }]}>
                 {bloodTypes.map((type) => (
                   <TouchableOpacity
@@ -542,6 +566,40 @@ export default function SignInScreen() {
             </View>
           )}
 
+          {isSignUp && (
+            <View style={styles.consentContainer}>
+              <TouchableOpacity
+                style={styles.consentRow}
+                onPress={() => setAcceptTerms(!acceptTerms)}
+              >
+                <View style={[styles.checkbox, acceptTerms && styles.checkboxChecked]}>
+                  {acceptTerms && <MaterialIcons name="check" size={16} color="#FFFFFF" />}
+                </View>
+                <ThemedText style={styles.consentText}>
+                  I accept the <ThemedText style={styles.linkText} onPress={() => router.push('/terms-of-service')}>Terms of Service</ThemedText>
+                </ThemedText>
+              </TouchableOpacity>
+              {errors.acceptTerms && (
+                <ThemedText style={styles.errorText}>{errors.acceptTerms}</ThemedText>
+              )}
+
+              <TouchableOpacity
+                style={[styles.consentRow, { marginTop: 12 }]}
+                onPress={() => setAcceptPrivacy(!acceptPrivacy)}
+              >
+                <View style={[styles.checkbox, acceptPrivacy && styles.checkboxChecked]}>
+                  {acceptPrivacy && <MaterialIcons name="check" size={16} color="#FFFFFF" />}
+                </View>
+                <ThemedText style={styles.consentText}>
+                  I accept the <ThemedText style={styles.linkText} onPress={() => router.push('/privacy-policy')}>Privacy Policy</ThemedText>
+                </ThemedText>
+              </TouchableOpacity>
+              {errors.acceptPrivacy && (
+                <ThemedText style={styles.errorText}>{errors.acceptPrivacy}</ThemedText>
+              )}
+            </View>
+          )}
+
           {/* Submit Button */}
           <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={isLoading}>
             {isLoading ? (
@@ -662,6 +720,41 @@ const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.cre
     fontSize: 16,
     color: colors.textSecondary,
     textAlign: "center",
+  },
+
+  // Consent
+  consentContainer: {
+    marginBottom: 12,
+  },
+  consentRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: colors.borderLight,
+    marginRight: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+  },
+  checkboxChecked: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  consentText: {
+    fontSize: 14,
+    color: colors.textPrimary,
+    lineHeight: 22,
+    flex: 1,
+  },
+  linkText: {
+    fontSize: 14,
+    color: colors.primary,
+    fontWeight: "600",
   },
 
   // Form

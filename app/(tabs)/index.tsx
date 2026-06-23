@@ -166,7 +166,7 @@ export default function HomeScreen() {
         <View style={s.header}>
           <View style={s.headerRow}>
             <View style={s.logoRow}>
-              <MaterialIcons name="favorite" size={26} color={colors.primary} />
+              <MaterialIcons name="water-drop" size={26} color={colors.primary} />
               <ThemedText style={s.logoText}>iDonate</ThemedText>
             </View>
             <TouchableOpacity style={s.bellBtn} onPress={() => router.push("/notifications")}>

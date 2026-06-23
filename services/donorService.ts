@@ -44,7 +44,7 @@ export async function getDonorProfile(userId: string) {
 /** Update the user's profile in the profiles table */
 export async function updateProfile(
     userId: string,
-    updates: { full_name?: string; phone_number?: string }
+    updates: { full_name?: string; phone_number?: string; default_anonymous?: boolean }
 ) {
     console.log('[iDonate:DonorService] updateProfile', { userId, updates });
 
