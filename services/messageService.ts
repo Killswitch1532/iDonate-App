@@ -133,5 +133,9 @@ export function subscribeToMessages(
         callback(payload.new as Message);
       }
     )
-    .subscribe();
+    .subscribe((status) => {
+      if (status === 'CHANNEL_ERROR') {
+        console.warn('[iDonate:MessageService] Realtime failed — ensure migration 021 is applied in Supabase');
+      }
+    });
 }

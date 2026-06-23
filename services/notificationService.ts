@@ -78,10 +78,122 @@ export async function registerForPushNotifications(): Promise<string | null> {
   }
 }
 
-/**
- * Set up notification tap listener. Returns a cleanup function.
- * Safe to call in Expo Go (no-ops gracefully).
- */
+export function getConversationIdFromPayload(data: Record<string, any> | null | undefined): string | null {
+  if (!data) return null;
+  return data.conversationId || data.conversation_id || null;
+}
+
+export async function getConversationChatParams(conversationId: string) {
+  const { data, error } = await supabase
+    .from('conversations')
+    .select(`
+      id,
+      donations:appointment_id (scheduled_date),
+      institutions:institution_id (institution_name)
+    `)
+    .eq('id', conversationId)
+    .single();
+
+  if (error || !data) {
+    return {
+      conversationId,
+      institutionName: 'Donation Centre',
+      appointmentDate: '',
+    };
+  }
+
+  const donation = data.donations as { scheduled_date?: string } | null;
+  const institution = data.institutions as { institution_name?: string } | null;
+
+  return {
+    conversationId,
+    institutionName: institution?.institution_name || 'Donation Centre',
+    appointmentDate: donation?.scheduled_date
+      ? new Date(donation.scheduled_date).toLocaleDateString()
+      : '',
+  };
+}
+
+export async function openAppointmentChat(
+  router: { push: (args: any) => void },
+  conversationId: string,
+  fallbackTitle?: string
+) {
+  const params = await getConversationChatParams(conversationId);
+  router.push({
+    pathname: '/chat',
+    params: {
+      ...params,
+      institutionName:
+        params.institutionName ||
+        fallbackTitle?.replace(' sent a message', '') ||
+        'Donation Centre',
+    },
+  } as any);
+}
+
+export async function navigateFromPushData(
+  router: { push: (args: any) => void },
+  data: Record<string, any>
+): Promise<void> {
+  const conversationId = getConversationIdFromPayload(data);
+  if (conversationId) {
+    await openAppointmentChat(router, conversationId);
+    return;
+  }
+
+  if (data.requestId) {
+    router.push({
+      pathname: '/blood-request/[id]',
+      params: { id: data.requestId },
+    } as any);
+    return;
+  }
+
+  if (data.notificationId) {
+    const { data: notif } = await supabase
+      .from('notifications')
+      .select('id, type, title, data')
+      .eq('id', data.notificationId)
+      .maybeSingle();
+
+    if (notif) {
+      await navigateFromNotification(router, notif);
+      return;
+    }
+
+    router.push({
+      pathname: '/notification-detail',
+      params: { id: data.notificationId },
+    } as any);
+  }
+}
+
+export async function navigateFromNotification(
+  router: { push: (args: any) => void },
+  notification: Pick<Notification, 'id' | 'type' | 'title' | 'data'>
+): Promise<void> {
+  const conversationId = getConversationIdFromPayload(notification.data);
+
+  if (notification.type === 'appointment_message' && conversationId) {
+    await openAppointmentChat(router, conversationId, notification.title);
+    return;
+  }
+
+  if (notification.data?.requestId) {
+    router.push({
+      pathname: '/blood-request/[id]',
+      params: { id: notification.data.requestId },
+    } as any);
+    return;
+  }
+
+  router.push({
+    pathname: '/notification-detail',
+    params: { id: notification.id },
+  } as any);
+}
+
 export async function setupNotificationListeners(
   onTap: (data: Record<string, any>) => void
 ): Promise<() => void> {
@@ -96,6 +208,23 @@ export async function setupNotificationListeners(
     return () => subscription.remove();
   } catch {
     return () => {};
+  }
+}
+
+/** Handle notification tap when app was opened from a killed state */
+export async function handleInitialNotificationResponse(
+  onTap: (data: Record<string, any>) => void
+): Promise<void> {
+  if (isExpoGo()) return;
+
+  try {
+    const response = await Notifications.getLastNotificationResponseAsync();
+    if (response) {
+      const data = response.notification.request.content.data || {};
+      onTap(data);
+    }
+  } catch (error) {
+    console.warn('[iDonate:Notifications] Initial response check failed', error);
   }
 }
 

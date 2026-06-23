@@ -13,7 +13,11 @@ import "react-native-reanimated";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
-import { setupNotificationListeners } from "@/services/notificationService";
+import {
+  setupNotificationListeners,
+  handleInitialNotificationResponse,
+  navigateFromPushData,
+} from "@/services/notificationService";
 import { ThemeProvider as AppThemeProvider } from "@/contexts/ThemeContext";
 import { useTheme } from "@/hooks/useTheme";
 
@@ -66,24 +70,17 @@ function RootLayoutNav() {
 
   // Handle notification taps → navigate to appropriate screen
   useEffect(() => {
+    if (!appIsReady || loading || !user) return;
+
     let cleanup: (() => void) | undefined;
-    setupNotificationListeners((data) => {
-      if (data?.notificationId) {
-        // Navigate to notification detail screen if we have notification ID
-        router.push({
-          pathname: '/notification-detail',
-          params: { id: data.notificationId }
-        } as any);
-      } else if (data?.requestId) {
-        // Fall back to blood request detail if no notification ID
-        router.push({
-          pathname: '/blood-request/[id]',
-          params: { id: data.requestId }
-        } as any);
-      }
-    }).then(fn => { cleanup = fn; });
+    const onNotificationTap = (data: Record<string, any>) => {
+      navigateFromPushData(router, data);
+    };
+
+    handleInitialNotificationResponse(onNotificationTap);
+    setupNotificationListeners(onNotificationTap).then(fn => { cleanup = fn; });
     return () => cleanup?.();
-  }, []);
+  }, [appIsReady, loading, user]);
 
   if (!appIsReady || loading) {
     return (

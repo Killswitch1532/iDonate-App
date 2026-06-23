@@ -4,7 +4,11 @@ import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { ThemedText } from '@/components/themed-text';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { Notification } from '@/services/notificationService';
+import {
+  Notification,
+  openAppointmentChat,
+  getConversationIdFromPayload,
+} from '@/services/notificationService';
 import { useTheme } from '@/hooks/useTheme';
 
 export default function NotificationDetailScreen() {
@@ -55,6 +59,8 @@ export default function NotificationDetailScreen() {
         return { name: 'check-circle', color: colors.success };
       case 'reminder':
         return { name: 'event', color: colors.accent };
+      case 'appointment_message':
+        return { name: 'chatbubble-ellipses', color: colors.primary };
       case 'system_broadcast':
       default:
         return { name: 'notifications', color: colors.accent };
@@ -74,6 +80,13 @@ export default function NotificationDetailScreen() {
     const diffDays = Math.floor(diffHrs / 24);
     if (diffDays === 1) return 'Yesterday';
     return past.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const handleGoToChat = async () => {
+    const conversationId = getConversationIdFromPayload(notification?.data);
+    if (conversationId) {
+      await openAppointmentChat(router, conversationId, notification?.title);
+    }
   };
 
   const handleGoToRequest = () => {
@@ -134,6 +147,13 @@ export default function NotificationDetailScreen() {
       )}
 
       {/* Action Button */}
+      {getConversationIdFromPayload(notification?.data) && (
+        <TouchableOpacity style={styles.actionButton} onPress={handleGoToChat}>
+          <Ionicons name="chatbubble-outline" size={20} color={colors.surface} />
+          <Text style={styles.actionButtonText}>Open Appointment Chat</Text>
+        </TouchableOpacity>
+      )}
+
       {notification.data?.requestId && (
         <TouchableOpacity style={styles.actionButton} onPress={handleGoToRequest}>
           <Ionicons name="eye-outline" size={20} color={colors.surface} />

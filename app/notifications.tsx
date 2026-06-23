@@ -20,8 +20,9 @@ import {
   markAsRead, 
   markAllAsRead, 
   deleteNotification,
-  clearAllNotifications, 
-  Notification 
+  clearAllNotifications,
+  navigateFromNotification,
+  Notification,
 } from "@/services/notificationService";
 import { useTheme } from '@/hooks/useTheme';
 
@@ -42,7 +43,7 @@ export default function NotificationsScreen() {
     };
   }, [resetBadgeCount]);
 
-  const filters = ["All", "Requests", "Broadcasts", "Reminders"];
+  const filters = ["All", "Messages", "Requests", "Broadcasts", "Reminders"];
 
   const loadNotifications = useCallback(async (showLoading = true) => {
     if (!user?.id) return;
@@ -82,11 +83,7 @@ export default function NotificationsScreen() {
       }
     }
 
-    // Navigate to notification detail screen
-    router.push({
-      pathname: '/notification-detail',
-      params: { id: notification.id }
-    } as any);
+    await navigateFromNotification(router, notification);
   };
 
   const handleMarkAllRead = async () => {
@@ -139,6 +136,7 @@ export default function NotificationsScreen() {
     switch (type) {
       case 'urgent_request': return { name: 'warning', color: colors.primary };
       case 'appointment_confirmed': return { name: 'check-circle', color: colors.success };
+      case 'appointment_message': return { name: 'chatbubble-ellipses', color: colors.primary };
       case 'system_broadcast': return { name: 'campaign', color: colors.accent };
       default: return { name: 'notifications', color: colors.accent };
     }
@@ -146,6 +144,7 @@ export default function NotificationsScreen() {
 
   const filteredNotifications = notifications.filter(n => {
     if (selectedFilter === 'All') return true;
+    if (selectedFilter === 'Messages') return n.type === 'appointment_message';
     if (selectedFilter === 'Requests') return n.type === 'urgent_request';
     if (selectedFilter === 'Broadcasts') return n.type === 'system_broadcast';
     if (selectedFilter === 'Reminders') return n.type === 'reminder';
