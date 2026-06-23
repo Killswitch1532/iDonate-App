@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, View, TouchableOpacity, Alert, Linking, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router, Stack } from "expo-router";
+import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import { ThemedText } from "@/components/themed-text";
@@ -11,6 +11,7 @@ import { getDonorProfile, getCooldownStatus } from "@/services/donorService";
 import { extractCoords } from "@/services/institutionService";
 import { getCache, setCache } from "@/services/offlineCache";
 import { useTheme } from "@/hooks/useTheme";
+import { getOrCreateConversation } from "@/services/messageService";
 
 export default function DonationsScreen() {
   const { colors, isDark } = useTheme();
@@ -131,6 +132,49 @@ export default function DonationsScreen() {
     }
   };
 
+  const handleCallCenter = (phoneNumber: string) => {
+    const url = `tel:${phoneNumber}`;
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Call Error', 'Could not open phone application.');
+    });
+  };
+
+  const handleMessageCenter = async (donation: any) => {
+    if (!user?.id) return;
+    
+    // Check if this is an institution-linked donation
+    if (!donation.institution_id) {
+      Alert.alert('Not Available', 'Messaging is only available for donations at institutions.');
+      return;
+    }
+
+    try {
+      const { data: conversation, error } = await getOrCreateConversation(
+        donation.id,
+        donation.institution_id,
+        user.id
+      );
+
+      if (error) {
+        Alert.alert('Error', 'Could not start conversation. Please try again.');
+        return;
+      }
+
+      if (conversation) {
+        router.push({
+          pathname: '/chat',
+          params: {
+            conversationId: conversation.id,
+            institutionName: donation.institutions?.institution_name || 'Institution',
+            appointmentDate: new Date(donation.scheduled_date).toLocaleDateString()
+          }
+        });
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Could not start conversation. Please try again.');
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'scheduled': return { bg: isDark ? '#1E3A8A' : '#DBEAFE', text: isDark ? '#60A5FA' : '#2563EB', icon: 'calendar-outline' };
@@ -209,9 +253,8 @@ export default function DonationsScreen() {
                 institutionName = `${name} (${location})`;
               }
               institutionName = institutionName || 'Medical Center';
+              const institutionPhone = donation.institutions?.profiles?.phone_number || null;
               
-              const dateNeeded = donation.blood_requests?.date_needed;
-              const timeNeeded = donation.blood_requests?.time_needed;
               const requestedType = donation.blood_requests?.blood_type_needed;
               const coords = extractCoords(donation.institutions?.location || donation.blood_requests?.hospital_location);
               
@@ -233,8 +276,20 @@ export default function DonationsScreen() {
                     <ThemedText style={styles.dateText}>{dateStr}</ThemedText>
                   </View>
 
-                  {/* Center Name */}
-                  <ThemedText style={styles.institutionName}>{institutionName}</ThemedText>
+                  {/* Center Name + Call Icon */}
+                  <View style={styles.institutionRow}>
+                    <ThemedText style={styles.institutionName}>{institutionName}</ThemedText>
+                    {institutionPhone && (
+                      <TouchableOpacity
+                        style={styles.callIconBtn}
+                        onPress={() => handleCallCenter(institutionPhone)}
+                        accessibilityLabel="Call donation centre"
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="call" size={16} color={colors.success} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
 
                   {/* Request Context (if any) */}
                   {requestedType && (
@@ -266,6 +321,23 @@ export default function DonationsScreen() {
                       <Ionicons name="navigate-outline" size={16} color={colors.accent} />
                       <ThemedText style={styles.navigateBtnText}>Get Directions</ThemedText>
                     </TouchableOpacity>
+                  )}
+
+                  {/* Contact Donation Center Section */}
+                  {donation.institutions && (
+                    <View style={styles.contactSection}>
+                      <View style={styles.contactSectionHeader}>
+                        <Ionicons name="chatbubble-ellipses-outline" size={16} color={colors.textSecondary} />
+                        <ThemedText style={styles.contactSectionTitle}>Contact Donation Center</ThemedText>
+                      </View>
+                      <TouchableOpacity 
+                        style={styles.contactBtn}
+                        onPress={() => handleMessageCenter(donation)}
+                      >
+                        <Ionicons name="chatbubble-outline" size={20} color={colors.primary} />
+                        <ThemedText style={[styles.contactBtnText, { color: colors.primary }]}>Message Centre</ThemedText>
+                      </TouchableOpacity>
+                    </View>
                   )}
 
                   {/* Notes */}
@@ -353,295 +425,350 @@ export default function DonationsScreen() {
   );
 }
 
-const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.textPrimary,
-  },
-  refreshBtn: {
-    padding: 8,
-    borderRadius: 10,
-    backgroundColor: colors.background,
-  },
-
-  filterSection: {
-    backgroundColor: colors.card,
-    paddingBottom: 12,
-  },
-  filterContainer: {
-    paddingHorizontal: 20,
-    gap: 10,
-  },
-  filterTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-  },
-  activeFilterTab: {
-    backgroundColor: colors.primaryLight,
-    borderColor: colors.primary + '50',
-  },
-  filterTabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  activeFilterTabText: {
-    color: colors.primary,
-  },
-  container: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 20,
-    paddingBottom: 120,
-    flexGrow: 1,
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.textPrimary,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: 24,
-    maxWidth: '80%',
-  },
-  donateButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  donateButtonText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  listContainer: {
-    gap: 16,
-  },
-  historyCard: {
-    backgroundColor: colors.card,
-    borderRadius: 20,
-    padding: 16,
-    shadowColor: colors.shadowColor,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: isDark ? 0.2 : 0.05,
-    shadowRadius: 10,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  dateText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  institutionName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.textPrimary,
-    marginBottom: 6,
-  },
-  contextRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 12,
-    backgroundColor: colors.primaryLight,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-  },
-  contextText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  detailsGrid: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 16,
-  },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  detailText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    fontWeight: '500',
-  },
-  notesSection: {
-    backgroundColor: colors.background,
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 12,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.border,
-  },
-  notesHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
-  },
-  notesLabel: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-  },
-  notesText: {
-    fontSize: 13,
-    color: colors.textPrimary,
-    lineHeight: 18,
-    fontStyle: 'italic',
-  },
-  cancelBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    borderRadius: 12,
-  },
-  cancelBtnText: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  confirmBtn: {
-    flex: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    backgroundColor: colors.success,
-    borderRadius: 12,
-  },
-  confirmBtnText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 8,
-  },
-  waitingBadge: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    backgroundColor: isDark ? '#451A03' : '#FFFBEB',
-    borderWidth: 1,
-    borderColor: isDark ? '#78350F' : '#FEF3C7',
-    borderRadius: 12,
-  },
-  waitingText: {
-    color: isDark ? '#FDE68A' : '#D97706',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  navigateBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    backgroundColor: isDark ? '#172554' : '#EFF6FF',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: isDark ? '#1E3A8A' : '#BFDBFE',
-    marginBottom: 12,
-  },
-  navigateBtnText: {
-    color: isDark ? '#60A5FA' : '#2563EB',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  fab: {
-    position: 'absolute',
-    bottom: 100,
-    right: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderRadius: 28,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  fabText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  fabDisabled: {
-    backgroundColor: colors.iconMuted,
-    shadowColor: colors.iconMuted,
-  },
-}), [colors, isDark]);
+const useStyles = (colors: any, isDark: boolean) => {
+  return useMemo(() => StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      backgroundColor: colors.card,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderLight,
+    },
+    headerTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: colors.textPrimary,
+    },
+    refreshBtn: {
+      padding: 8,
+      borderRadius: 10,
+      backgroundColor: colors.background,
+    },
+    filterSection: {
+      backgroundColor: colors.card,
+      paddingBottom: 12,
+    },
+    filterContainer: {
+      paddingHorizontal: 20,
+      gap: 10,
+    },
+    filterTab: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.borderLight,
+    },
+    activeFilterTab: {
+      backgroundColor: colors.primaryLight,
+      borderColor: colors.primary + '50',
+    },
+    filterTabText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    activeFilterTabText: {
+      color: colors.primary,
+    },
+    container: {
+      flex: 1,
+    },
+    contentContainer: {
+      padding: 20,
+      paddingBottom: 120,
+      flexGrow: 1,
+    },
+    centerContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingVertical: 60,
+    },
+    emptyText: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors.textPrimary,
+      marginTop: 16,
+      marginBottom: 8,
+    },
+    emptySubtext: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      marginBottom: 24,
+      maxWidth: '80%',
+    },
+    donateButton: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      borderRadius: 12,
+    },
+    donateButtonText: {
+      color: '#FFFFFF',
+      fontWeight: 'bold',
+      fontSize: 16,
+    },
+    listContainer: {
+      gap: 16,
+    },
+    historyCard: {
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      padding: 16,
+      shadowColor: colors.shadowColor,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: isDark ? 0.2 : 0.05,
+      shadowRadius: 10,
+      elevation: 3,
+      borderWidth: 1,
+      borderColor: colors.borderLight,
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    statusBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    statusText: {
+      fontSize: 10,
+      fontWeight: '800',
+      letterSpacing: 0.5,
+    },
+    dateText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    institutionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 8,
+      marginBottom: 6,
+    },
+    institutionName: {
+      flex: 1,
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors.textPrimary,
+    },
+    callIconBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: isDark ? '#14532D' : '#DCFCE7',
+      borderWidth: 1,
+      borderColor: isDark ? '#166534' : '#BBF7D0',
+    },
+    contextRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 12,
+      backgroundColor: colors.primaryLight,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 8,
+      alignSelf: 'flex-start',
+    },
+    contextText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.primary,
+    },
+    detailsGrid: {
+      flexDirection: 'row',
+      gap: 16,
+      marginBottom: 16,
+    },
+    detailItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    detailText: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      fontWeight: '500',
+    },
+    notesSection: {
+      backgroundColor: colors.background,
+      padding: 12,
+      borderRadius: 12,
+      marginBottom: 12,
+      borderLeftWidth: 3,
+      borderLeftColor: colors.border,
+    },
+    notesHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 4,
+    },
+    notesLabel: {
+      fontSize: 11,
+      fontWeight: 'bold',
+      color: colors.textSecondary,
+      textTransform: 'uppercase',
+    },
+    notesText: {
+      fontSize: 13,
+      color: colors.textPrimary,
+      lineHeight: 18,
+      fontStyle: 'italic',
+    },
+    cancelBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 12,
+      borderWidth: 1,
+      borderColor: colors.borderLight,
+      borderRadius: 12,
+    },
+    cancelBtnText: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    confirmBtn: {
+      flex: 2,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 12,
+      backgroundColor: colors.success,
+      borderRadius: 12,
+    },
+    confirmBtnText: {
+      color: '#FFFFFF',
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    actionRow: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 8,
+    },
+    waitingBadge: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 12,
+      backgroundColor: isDark ? '#451A03' : '#FFFBEB',
+      borderWidth: 1,
+      borderColor: isDark ? '#78350F' : '#FEF3C7',
+      borderRadius: 12,
+    },
+    waitingText: {
+      color: isDark ? '#FDE68A' : '#D97706',
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    navigateBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 10,
+      backgroundColor: isDark ? '#172554' : '#EFF6FF',
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: isDark ? '#1E3A8A' : '#BFDBFE',
+      marginBottom: 12,
+    },
+    navigateBtnText: {
+      color: isDark ? '#60A5FA' : '#2563EB',
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    fab: {
+      position: 'absolute',
+      bottom: 100,
+      right: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: colors.primary,
+      paddingHorizontal: 20,
+      paddingVertical: 14,
+      borderRadius: 28,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 6,
+    },
+    fabText: {
+      color: '#FFFFFF',
+      fontSize: 15,
+      fontWeight: '700',
+    },
+    fabDisabled: {
+      backgroundColor: colors.iconMuted,
+      shadowColor: colors.iconMuted,
+    },
+    contactSection: {
+      marginTop: 12,
+      marginBottom: 12,
+      padding: 12,
+      backgroundColor: colors.background,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.borderLight,
+    },
+    contactSectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 12,
+    },
+    contactSectionTitle: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    contactBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.borderLight,
+    },
+    contactBtnText: {
+      fontSize: 14,
+      fontWeight: '700',
+    },
+  }), [colors, isDark]);
+};

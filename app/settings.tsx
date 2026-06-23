@@ -15,7 +15,6 @@ import {
   cancelAllDonationReminders,
   ReminderSettings,
 } from '@/services/notificationService';
-import { getCooldownStatus } from '@/services/donorService';
 
 export default function SettingsScreen() {
   const { colors, isDark, themeMode, setThemeMode } = useTheme();
