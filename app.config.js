@@ -46,6 +46,7 @@ module.exports = {
         monochromeImage: './assets/images/android-icon-monochrome.png',
       },
       edgeToEdgeEnabled: true,
+      softwareKeyboardLayoutMode: 'resize',
       predictiveBackGestureEnabled: false,
       package: androidPackage,
       googleServicesFile: './google-services.json',

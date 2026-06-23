@@ -11,7 +11,7 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router, useLocalSearchParams, Stack } from "expo-router";
+import { useLocalSearchParams, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import { ThemedText } from "@/components/themed-text";
@@ -25,8 +25,8 @@ import {
 } from "@/services/messageService";
 
 export default function ChatScreen() {
-  const { colors, isDark } = useTheme();
-  const styles = useStyles(colors, isDark);
+  const { colors } = useTheme();
+  const styles = useStyles(colors);
   const { user } = useAuth();
   const { conversationId, institutionName, appointmentDate } =
     useLocalSearchParams<{
@@ -120,86 +120,90 @@ export default function ChatScreen() {
       </View>
 
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
         {/* Messages List */}
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        ) : (
-          <ScrollView
-            ref={scrollViewRef}
-            style={styles.messagesContainer}
-            contentContainerStyle={styles.messagesContent}
-          >
-            {messages.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Ionicons
-                  name="chatbubble-ellipses-outline"
-                  size={64}
-                  color={colors.iconMuted}
-                />
-                <ThemedText style={styles.emptyText}>
-                  No messages yet
-                </ThemedText>
-                <ThemedText style={styles.emptySubtext}>
-                  Send a message to start the conversation
-                </ThemedText>
-              </View>
-            ) : (
-              messages.map((message) => {
-                const isOwnMessage = message.sender_id === user?.id;
-                return (
-                  <View
-                    key={message.id}
-                    style={[
-                      styles.messageWrapper,
-                      isOwnMessage
-                        ? styles.ownMessageWrapper
-                        : styles.otherMessageWrapper,
-                    ]}
-                  >
+        <View style={styles.chatBody}>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : (
+            <ScrollView
+              ref={scrollViewRef}
+              style={styles.messagesContainer}
+              contentContainerStyle={styles.messagesContent}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+            >
+              {messages.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Ionicons
+                    name="chatbubble-ellipses-outline"
+                    size={64}
+                    color={colors.iconMuted}
+                  />
+                  <ThemedText style={styles.emptyText}>
+                    No messages yet
+                  </ThemedText>
+                  <ThemedText style={styles.emptySubtext}>
+                    Send a message to start the conversation
+                  </ThemedText>
+                </View>
+              ) : (
+                messages.map((message) => {
+                  const isOwnMessage = message.sender_id === user?.id;
+                  return (
                     <View
+                      key={message.id}
                       style={[
-                        styles.messageBubble,
+                        styles.messageWrapper,
                         isOwnMessage
-                          ? styles.ownMessageBubble
-                          : styles.otherMessageBubble,
+                          ? styles.ownMessageWrapper
+                          : styles.otherMessageWrapper,
                       ]}
                     >
-                      <ThemedText
+                      <View
                         style={[
-                          styles.messageText,
+                          styles.messageBubble,
                           isOwnMessage
-                            ? styles.ownMessageText
-                            : styles.otherMessageText,
+                            ? styles.ownMessageBubble
+                            : styles.otherMessageBubble,
                         ]}
                       >
-                        {message.message}
-                      </ThemedText>
-                      <ThemedText
-                        style={[
-                          styles.messageTime,
-                          isOwnMessage
-                            ? styles.ownMessageTime
-                            : styles.otherMessageTime,
-                        ]}
-                      >
-                        {new Date(message.created_at).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </ThemedText>
+                        <ThemedText
+                          style={[
+                            styles.messageText,
+                            isOwnMessage
+                              ? styles.ownMessageText
+                              : styles.otherMessageText,
+                          ]}
+                        >
+                          {message.message}
+                        </ThemedText>
+                        <ThemedText
+                          style={[
+                            styles.messageTime,
+                            isOwnMessage
+                              ? styles.ownMessageTime
+                              : styles.otherMessageTime,
+                          ]}
+                        >
+                          {new Date(message.created_at).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </ThemedText>
+                      </View>
                     </View>
-                  </View>
-                );
-              })
-            )}
-          </ScrollView>
-        )}
+                  );
+                })
+              )}
+            </ScrollView>
+          )}
+        </View>
 
         {/* Input Area */}
         <View style={styles.inputContainer}>
@@ -211,6 +215,8 @@ export default function ChatScreen() {
             onChangeText={setMessageText}
             multiline
             maxLength={500}
+            scrollEnabled={false}
+            textAlignVertical="center"
           />
           <TouchableOpacity
             style={[
@@ -232,7 +238,7 @@ export default function ChatScreen() {
   );
 }
 
-const useStyles = (colors: any, isDark: boolean) =>
+const useStyles = (colors: any) =>
   useMemo(
     () =>
       StyleSheet.create({
@@ -256,6 +262,13 @@ const useStyles = (colors: any, isDark: boolean) =>
           fontSize: 14,
           color: colors.textSecondary,
         },
+        keyboardAvoidingView: {
+          flex: 1,
+        },
+        chatBody: {
+          flex: 1,
+          minHeight: 0,
+        },
         loadingContainer: {
           flex: 1,
           justifyContent: "center",
@@ -265,7 +278,9 @@ const useStyles = (colors: any, isDark: boolean) =>
           flex: 1,
         },
         messagesContent: {
+          flexGrow: 1,
           padding: 16,
+          paddingBottom: 12,
         },
         emptyContainer: {
           flex: 1,
@@ -348,6 +363,7 @@ const useStyles = (colors: any, isDark: boolean) =>
           paddingVertical: 10,
           fontSize: 16,
           color: colors.textPrimary,
+          minHeight: 40,
           maxHeight: 100,
           borderWidth: 1,
           borderColor: colors.borderLight,
@@ -364,5 +380,5 @@ const useStyles = (colors: any, isDark: boolean) =>
           backgroundColor: colors.iconMuted,
         },
       }),
-    [colors, isDark]
+    [colors]
   );
