@@ -312,25 +312,34 @@ export const markAsRead = async (notificationId: string) => {
 };
 
 export const markAllAsRead = async (userId: string) => {
-  return await supabase
+  console.log('[iDonate:Notifications] Marking all as read for user:', userId);
+  const result = await supabase
     .from('notifications')
     .update({ is_read: true })
     .eq('user_id', userId)
     .eq('is_read', false);
+  console.log('[iDonate:Notifications] Mark all as read result:', result);
+  return result;
 };
 
 export const deleteNotification = async (notificationId: string) => {
-  return await supabase
+  console.log('[iDonate:Notifications] Deleting notification:', notificationId);
+  const result = await supabase
     .from('notifications')
     .delete()
     .eq('id', notificationId);
+  console.log('[iDonate:Notifications] Delete notification result:', result);
+  return result;
 };
 
 export const clearAllNotifications = async (userId: string) => {
-  return await supabase
+  console.log('[iDonate:Notifications] Clearing all notifications for user:', userId);
+  const result = await supabase
     .from('notifications')
     .delete()
     .eq('user_id', userId);
+  console.log('[iDonate:Notifications] Clear all result:', result);
+  return result;
 };
 
 /**

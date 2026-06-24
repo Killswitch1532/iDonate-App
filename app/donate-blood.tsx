@@ -99,7 +99,7 @@ export default function DonateBloodScreen() {
       setSelectedSlotId(null);
       setTimeChosen(false);
     }
-  }, [selectedCenter, selectedDate.toDateString(), loadSlots]);
+  }, [selectedCenter, selectedDate, loadSlots]);
 
   const detectLocation = useCallback(async () => {
     setLocationLoading(true);
@@ -1194,3 +1194,4 @@ const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.cre
     marginTop: 12,
   },
 }), [colors, isDark]);
+

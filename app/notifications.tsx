@@ -87,6 +87,7 @@ export default function NotificationsScreen() {
   };
 
   const handleMarkAllRead = async () => {
+    console.log('[iDonate:Notifications] handleMarkAllRead called, user:', user);
     if (!user?.id) return;
     try {
       const { error } = await markAllAsRead(user.id);
@@ -95,11 +96,12 @@ export default function NotificationsScreen() {
       refreshUnreadCount();
     } catch (error) {
       console.error('[iDonate:Notifications] Mark all as read failed', error);
-      Alert.alert('Error', 'Failed to mark all as read');
+      Alert.alert('Error', 'Failed to mark all as read: ' + (error as any)?.message);
     }
   };
 
   const handleClearAll = async () => {
+    console.log('[iDonate:Notifications] handleClearAll called, user:', user);
     Alert.alert(
       "Clear Notifications",
       "Are you sure you want to delete all notification history?",
@@ -117,7 +119,7 @@ export default function NotificationsScreen() {
               refreshUnreadCount();
             } catch (error) {
               console.error('[iDonate:Notifications] Clear all failed', error);
-              Alert.alert('Error', 'Failed to clear all notifications');
+              Alert.alert('Error', 'Failed to clear all notifications: ' + (error as any)?.message);
             }
           }
         }
