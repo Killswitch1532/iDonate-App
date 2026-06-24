@@ -10,8 +10,8 @@ import {
   Platform,
   Alert,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams, Stack } from "expo-router";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useLocalSearchParams, Stack, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import { ThemedText } from "@/components/themed-text";
@@ -26,7 +26,8 @@ import {
 
 export default function ChatScreen() {
   const { colors } = useTheme();
-  const styles = useStyles(colors);
+  const insets = useSafeAreaInsets();
+  const styles = useStyles(colors, insets);
   const { user } = useAuth();
   const { conversationId, institutionName, appointmentDate } =
     useLocalSearchParams<{
@@ -103,27 +104,31 @@ export default function ChatScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <Stack.Screen
         options={{
-          headerTitle: institutionName,
-          headerBackTitle: "Back",
+          headerShown: false,
         }}
       />
-
-      {/* Header with appointment info */}
-      <View style={styles.header}>
-        <ThemedText style={styles.headerTitle}>{institutionName}</ThemedText>
-        <ThemedText style={styles.headerSubtitle}>
-          Appointment: {appointmentDate}
-        </ThemedText>
-      </View>
-
+      
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingView}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
       >
+        {/* Header with appointment info */}
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <View style={styles.headerContent}>
+            <ThemedText style={styles.headerTitle}>{institutionName}</ThemedText>
+            <ThemedText style={styles.headerSubtitle}>
+              Appointment: {appointmentDate}
+            </ThemedText>
+          </View>
+        </View>
+
         {/* Messages List */}
         <View style={styles.chatBody}>
           {loading ? (
@@ -238,7 +243,7 @@ export default function ChatScreen() {
   );
 }
 
-const useStyles = (colors: any) =>
+const useStyles = (colors: any, insets: any) =>
   useMemo(
     () =>
       StyleSheet.create({
@@ -247,10 +252,20 @@ const useStyles = (colors: any) =>
           backgroundColor: colors.background,
         },
         header: {
+          flexDirection: "row",
+          alignItems: "center",
           padding: 16,
+          paddingTop: 16 + insets.top,
           backgroundColor: colors.card,
           borderBottomWidth: 1,
           borderBottomColor: colors.borderLight,
+        },
+        backButton: {
+          marginRight: 12,
+          padding: 4,
+        },
+        headerContent: {
+          flex: 1,
         },
         headerTitle: {
           fontSize: 18,
@@ -380,5 +395,5 @@ const useStyles = (colors: any) =>
           backgroundColor: colors.iconMuted,
         },
       }),
-    [colors]
+    [colors, insets]
   );

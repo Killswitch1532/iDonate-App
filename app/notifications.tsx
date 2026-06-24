@@ -88,10 +88,14 @@ export default function NotificationsScreen() {
 
   const handleMarkAllRead = async () => {
     if (!user?.id) return;
-    const { error } = await markAllAsRead(user.id);
-    if (!error) {
+    try {
+      const { error } = await markAllAsRead(user.id);
+      if (error) throw error;
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
       refreshUnreadCount();
+    } catch (error) {
+      console.error('[iDonate:Notifications] Mark all as read failed', error);
+      Alert.alert('Error', 'Failed to mark all as read');
     }
   };
 
@@ -106,10 +110,14 @@ export default function NotificationsScreen() {
           style: "destructive",
           onPress: async () => {
             if (!user?.id) return;
-            const { error } = await clearAllNotifications(user.id);
-            if (!error) {
+            try {
+              const { error } = await clearAllNotifications(user.id);
+              if (error) throw error;
               setNotifications([]);
               refreshUnreadCount();
+            } catch (error) {
+              console.error('[iDonate:Notifications] Clear all failed', error);
+              Alert.alert('Error', 'Failed to clear all notifications');
             }
           }
         }
@@ -136,7 +144,7 @@ export default function NotificationsScreen() {
     switch (type) {
       case 'urgent_request': return { name: 'warning', color: colors.primary };
       case 'appointment_confirmed': return { name: 'check-circle', color: colors.success };
-      case 'appointment_message': return { name: 'chatbubble-ellipses', color: colors.primary };
+      case 'appointment_message': return { name: 'chat-bubble-outline', color: colors.primary };
       case 'system_broadcast': return { name: 'campaign', color: colors.accent };
       default: return { name: 'notifications', color: colors.accent };
     }
@@ -162,9 +170,21 @@ export default function NotificationsScreen() {
             </View>
           )}
         </View>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="close" size={24} color={colors.icon} />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          {notifications.length > 0 && (
+            <>
+              <TouchableOpacity onPress={handleMarkAllRead} style={styles.headerActionBtn}>
+                <MaterialIcons name="done-all" size={22} color={colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleClearAll} style={styles.headerActionBtn}>
+                <MaterialIcons name="delete-sweep" size={22} color={colors.icon} />
+              </TouchableOpacity>
+            </>
+          )}
+          <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, styles.headerActionBtn]}>
+            <Ionicons name="close" size={24} color={colors.icon} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.filtersSection}>
@@ -270,22 +290,7 @@ export default function NotificationsScreen() {
           )}
         </View>
 
-        {notifications.length > 0 && (
-          <View style={styles.quickActions}>
-            <TouchableOpacity style={styles.quickActionButton} onPress={handleMarkAllRead}>
-              <View style={[styles.quickActionIconContainer, { backgroundColor: isDark ? 'rgba(49, 130, 206, 0.1)' : '#EBF8FF' }]}>
-                <MaterialIcons name="done-all" size={20} color={isDark ? '#63B3ED' : '#3182CE'} />
-              </View>
-              <ThemedText style={styles.quickActionText}>Mark all as read</ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickActionButton} onPress={handleClearAll}>
-              <View style={[styles.quickActionIconContainer, { backgroundColor: isDark ? 'rgba(231, 76, 60, 0.1)' : '#FFF5F5' }]}>
-                <MaterialIcons name="delete-sweep" size={20} color={colors.primary} />
-              </View>
-              <ThemedText style={styles.quickActionText}>Clear all notifications</ThemedText>
-            </TouchableOpacity>
-          </View>
-        )}
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -340,6 +345,13 @@ const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.cre
     fontWeight: "800",
   },
   backBtn: {
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerActionBtn: {
     padding: 8,
     backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : "#F8F9FA",
     borderRadius: 12,
@@ -499,39 +511,6 @@ const useStyles = (colors: any, isDark: boolean) => useMemo(() => StyleSheet.cre
     paddingHorizontal: 48,
     lineHeight: 22,
   },
-  quickActions: {
-    flexDirection: "column",
-    gap: 12,
-    marginTop: 12,
-  },
-  quickActionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-start",
-    backgroundColor: colors.card,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    shadowColor: colors.shadowColor,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: isDark ? 0.3 : 0.04,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  quickActionIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  quickActionText: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: colors.textPrimary,
-  },
+
 }), [colors, isDark]);
 
