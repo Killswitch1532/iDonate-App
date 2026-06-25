@@ -1,50 +1,149 @@
-# Welcome to your Expo app 👋
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+# iDonate Mobile App
 
-## Get started
+A cross-platform mobile application built with React Native + Expo that connects voluntary blood donors with verified healthcare institutions.
 
-1. Install dependencies
+## Features
 
+- **User Authentication**: Email/password login and Google sign-in
+- **Donor Profiles**: Manage personal info, blood type, eligibility, and location
+- **Blood Request Search**: Find nearby urgent blood requests
+- **Donation Scheduling**: Book appointments with verified institutions
+- **Geospatial Matching**: Uses GPS to match donors with nearby requests
+- **Push Notifications**: Real-time alerts for urgent requests and messages
+- **In-App Messaging**: Chat with institutions about scheduled donations
+- **Offline Support**: Cached data for offline viewing
+- **Eligibility Tracking**: Automatic 90-day cooldown period after donation
+
+## Tech Stack
+
+- **React Native 0.81.5**: Cross-platform mobile framework
+- **Expo 54 SDK**: Development platform for React Native
+- **Expo Router**: File-based routing
+- **Expo Location**: GPS tracking
+- **Expo Notifications**: Push notifications
+- **React Native Maps**: Interactive maps
+- **Supabase**: Backend (Auth, Database, Realtime, Storage)
+- **TypeScript**: Type-safe development
+
+## Prerequisites
+
+- Node.js 18+
+- npm or yarn
+- Expo CLI
+- A Supabase project
+- Android Studio (for Android development) or Xcode (for iOS development)
+
+## Setup Instructions
+
+1. **Clone the repository and navigate to the app directory**:
+   ```bash
+   cd iDonate-App
+   ```
+
+2. **Install dependencies**:
    ```bash
    npm install
    ```
 
-2. Start the app
+3. **Set up environment variables**:
+   - Copy the example environment file:
+     ```bash
+     cp .env.example .env
+     ```
+   - Fill in your Supabase project URL and anon key in `.env`
 
+4. **Set up Supabase**:
+   - Create a new project at [supabase.com](https://supabase.com)
+   - Run all database migrations from the `../supabase/` directory
+   - Enable PostGIS extension
+   - Set up a Storage bucket for profile pictures and documents
+
+5. **Start the development server**:
    ```bash
-   npx expo start
+   npm start
    ```
 
-In the output, you'll find options to open the app in a
+6. **Run on device/simulator**:
+   - For Android:
+     ```bash
+     npm run android
+     ```
+   - For iOS:
+     ```bash
+     npm run ios
+     ```
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Project Structure
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+iDonate-App/
+├── app/                      # Expo Router pages
+│   ├── (tabs)/               # Bottom tab navigation
+│   │   ├── index.tsx         # Home dashboard
+│   │   ├── donations.tsx     # Donation history
+│   │   ├── requests.tsx      # Blood requests
+│   │   ├── map.tsx           # Nearby institutions map
+│   │   └── profile.tsx       # Profile page
+│   ├── blood-request/        # Request detail pages
+│   ├── chat.tsx              # Messaging page
+│   ├── donate-blood.tsx      # Donation scheduling
+│   ├── edit-profile.tsx      # Profile editing
+│   ├── notifications.tsx     # Notifications list
+│   ├── signin.tsx            # Authentication
+│   └── ...
+├── components/               # Reusable components
+├── contexts/                 # React contexts (Auth, Notifications, etc.)
+├── hooks/                    # Custom hooks
+├── services/                 # API services (Supabase, matching, etc.)
+├── lib/                      # Utility libraries (Supabase client, etc.)
+├── assets/                   # Images and media
+└── package.json
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Available Scripts
 
-## Learn more
+- `npm start`: Start the Expo development server
+- `npm run android`: Run the app on an Android device/emulator
+- `npm run ios`: Run the app on an iOS simulator
+- `npm run web`: Run the app in a web browser
+- `npm run lint`: Run ESLint
+- `npm run reset-project`: Reset to blank project
 
-To learn more about developing your project with Expo, look at the following resources:
+## Key Features Breakdown
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+### Authentication
+- Email/password signup and login
+- Google sign-in integration
+- Supabase Auth handles secure user sessions
 
-## Join the community
+### Donor Eligibility
+- Tracks last donation date
+- Calculates next eligible donation date (90-day cooldown)
+- Checks minimum weight and age requirements
 
-Join our community of developers creating universal apps.
+### Geospatial Matching
+- Uses PostGIS for efficient location-based queries
+- Converts between WKB, GeoJSON, and latitude/longitude
+- Haversine distance calculations on client
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+### Messaging
+- Realtime chat via Supabase Realtime
+- Messages tied to donation appointments
+- Read status tracking
+- In-app notifications for new messages
+
+## Contributing
+
+Contributions are welcome! Please follow these steps:
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is part of the iDonate blood donation platform.
+

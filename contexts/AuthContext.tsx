@@ -253,40 +253,79 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password: string,
         metadata: Record<string, any> = {}
     ) {
+        // #region debug-point A:signup-input
+        fetch("http://192.168.100.56:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"signup-500-error",runId:"pre-fix",hypothesisId:"A",location:"AuthContext.tsx:signUp:start",msg:"[DEBUG] entering signUp",data:{email,hasPassword:Boolean(password),metadata:{full_name:metadata.full_name||null,user_type:metadata.user_type||null,phone_number_present:Boolean(metadata.phone_number)}},ts:Date.now()})}).catch(()=>{});
+        // #endregion
         console.log('[iDonate:Auth] signUp attempt', {
             email,
             metadata: { full_name: metadata.full_name, user_type: metadata.user_type, phone_number: metadata.phone_number },
         });
 
-        const { data, error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-                data: {
-                    full_name: metadata.full_name || '',
-                    user_type: metadata.user_type || 'donor',
-                    phone_number: metadata.phone_number || '',
+        try {
+            // First try to sign up
+            const { data, error } = await supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                    emailRedirectTo: 'idonateapp://auth-callback',
+                    data: {
+                        full_name: metadata.full_name || email, // Use email as fallback
+                        user_type: metadata.user_type || 'donor',
+                        phone_number: metadata.phone_number || '',
+                    },
                 },
-            },
-        });
-
-        if (error) {
-            console.error('[iDonate:Auth] signUp error', {
-                code: error.code,
-                message: error.message,
-                status: error.status,
-                name: error.name,
-                fullError: JSON.stringify(error),
             });
-        } else {
+
+            if (error) {
+                // #region debug-point B:signup-error
+                fetch("http://192.168.100.56:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"signup-500-error",runId:"pre-fix",hypothesisId:"B",location:"AuthContext.tsx:signUp:error",msg:"[DEBUG] supabase.auth.signUp returned error",data:{code:error.code||null,message:error.message||null,status:error.status||null,name:error.name||null},ts:Date.now()})}).catch(()=>{});
+                // #endregion
+                console.error('[iDonate:Auth] signUp error', {
+                    code: error.code,
+                    message: error.message,
+                    status: error.status,
+                    name: error.name,
+                    fullError: JSON.stringify(error),
+                });
+                return { error };
+            }
+
+            // #region debug-point C:signup-success
+            fetch("http://192.168.100.56:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"signup-500-error",runId:"pre-fix",hypothesisId:"C",location:"AuthContext.tsx:signUp:success",msg:"[DEBUG] supabase.auth.signUp returned success",data:{userId:data?.user?.id||null,hasSession:Boolean(data?.session),emailConfirmedAt:data?.user?.email_confirmed_at||null},ts:Date.now()})}).catch(()=>{});
+            // #endregion
             console.log('[iDonate:Auth] signUp succeeded', {
                 userId: data?.user?.id,
                 emailConfirmed: data?.user?.email_confirmed_at,
                 session: data?.session ? 'present' : 'null',
             });
-        }
 
-        return { error };
+            // If we have a user, try to create the profile manually (in case trigger failed)
+            if (data?.user) {
+                console.log('[iDonate:Auth] Manually creating profile for user', data.user.id);
+                const { error: profileError } = await supabase
+                    .from('profiles')
+                    .upsert({
+                        id: data.user.id,
+                        full_name: metadata.full_name || email,
+                        user_type: metadata.user_type || 'donor',
+                        phone_number: metadata.phone_number || null,
+                    }, { onConflict: 'id' });
+
+                if (profileError) {
+                    console.warn('[iDonate:Auth] Manual profile creation failed (maybe trigger succeeded already)', profileError);
+                } else {
+                    console.log('[iDonate:Auth] Manual profile creation succeeded');
+                }
+            }
+
+            return { error: null };
+        } catch (error: any) {
+            // #region debug-point D:signup-throw
+            fetch("http://192.168.100.56:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"signup-500-error",runId:"pre-fix",hypothesisId:"D",location:"AuthContext.tsx:signUp:catch",msg:"[DEBUG] signUp threw unexpected error",data:{message:error?.message||null,name:error?.name||null,code:error?.code||null,status:error?.status||null},ts:Date.now()})}).catch(()=>{});
+            // #endregion
+            console.error('[iDonate:Auth] signUp threw unexpected error', error);
+            return { error };
+        }
     }
 
     async function signIn(email: string, password: string) {
