@@ -420,6 +420,7 @@ export async function scheduleDonationReminders(nextEligibleDate: Date): Promise
           priority: Notifications.AndroidNotificationPriority.HIGH,
         },
         trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
           date: reminderDate,
         },
         identifier: reminderId,

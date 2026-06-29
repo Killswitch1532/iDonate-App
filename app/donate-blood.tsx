@@ -70,6 +70,10 @@ export default function DonateBloodScreen() {
   const [availableSlots, setAvailableSlots] = useState<any[]>([]);
   const [slotsLoading, setSlotsLoading] = useState<boolean>(false);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
+  const selectedDateKey = useMemo(
+    () => `${selectedDate.getFullYear()}-${selectedDate.getMonth()}-${selectedDate.getDate()}`,
+    [selectedDate]
+  );
 
   const loadSlots = useCallback(async (centerId: string, date: Date) => {
     setSlotsLoading(true);
@@ -99,7 +103,7 @@ export default function DonateBloodScreen() {
       setSelectedSlotId(null);
       setTimeChosen(false);
     }
-  }, [selectedCenter, selectedDate, loadSlots]);
+  }, [selectedCenter, selectedDateKey, loadSlots]);
 
   const detectLocation = useCallback(async () => {
     setLocationLoading(true);
